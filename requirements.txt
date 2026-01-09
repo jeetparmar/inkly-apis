@@ -1,0 +1,14 @@
+fastapi[all]
+python-jose[cryptography]
+passlib[bcrypt]
+uvicorn
+pydantic-settings
+starlette
+requests
+humanize
+motor
+pymongo
+python-multipart
+PyJWT>=2.7.0
+cachetools
+google-generativeai
