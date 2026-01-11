@@ -36,6 +36,7 @@ async def fetch_related_images(auth_response: current_user_dependency, title: st
 async def generate_content_from_llm(
     auth_response: current_user_dependency,
     type: PostType,
+    prompt: str,
     size: int,
     theme: Optional[str] = "inspiring",
     language: Optional[str] = "English",
@@ -46,6 +47,7 @@ async def generate_content_from_llm(
     return await generate_content_from_llm_service(
         auth_response.result["user_id"],
         type,
+        prompt,
         theme,
         size,
         language,

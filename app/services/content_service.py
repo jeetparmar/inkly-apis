@@ -72,6 +72,7 @@ async def fetch_related_images_service(login_user_id: str, title: str):
 async def generate_content_from_llm_service(
     login_user_id: str,
     type: PostType = None,
+    prompt: str = "a little boy",
     theme: str = None,
     size: int = 50,
     language: str = "English",
@@ -83,7 +84,7 @@ async def generate_content_from_llm_service(
     if error:
         return error
     # Call LLM
-    output = ask_from_gemini(type, "a little boy", size, language, theme)
+    output = ask_from_gemini(type, prompt, size, language, theme)
     if not output:
         return create_exception_response(500, "LLM returned empty output")
 
@@ -98,7 +99,7 @@ async def generate_content_from_llm_service(
     return create_success_response(
         200,
         FETCHED_SUCCESS.format(data="generated content"),
-        query={"type": type, "theme": theme, "size": size},
+        query={"type": type, "prompt": prompt, "theme": theme, "size": size},
         result={"title": title, "content": content},
     )
 
@@ -393,7 +394,7 @@ async def save_post_service(
                     "type": "earned",
                     "icon": icon,
                     "points": points,
-                    "reason": f"Posted {type}",
+                    "reason": f"Posted {type.value}",
                     "created_at": now,
                 }
             )
