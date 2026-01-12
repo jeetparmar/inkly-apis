@@ -322,7 +322,7 @@ async def save_post_service(
                     404, "post id not found or unauthorized"
                 )
 
-            message = f"{type} updated successfully"
+            message = f"{type.value} updated successfully"
             status = 200
         else:
             # New post creation
@@ -375,7 +375,7 @@ async def save_post_service(
                 points = 40
                 icon = "📰"
                 inc_request = {"total_articles": 1}
-            message = f"{type} created successfully and earned {points} points"
+            message = f"{type.value} created successfully and earned {points} points"
             status = 201
             # Increment user post count
             await users_collection.update_one(

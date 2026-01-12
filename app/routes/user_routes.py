@@ -11,6 +11,7 @@ from app.services.user_service import (
     user_send_otp_service,
     user_verify_otp_service,
     user_logout_service,
+    regenerate_token_service,
 )
 from app.utils.enums.ResponseStatus import ResponseStatus
 from app.config.auth.dependencies import get_current_user
@@ -21,6 +22,7 @@ from app.models.schema import (
     SendOTP,
     UserProfileUpdateRequest,
     VerifyOTP,
+    RegenerateTokenRequest,
 )
 
 user_router = APIRouter()
@@ -91,3 +93,8 @@ async def user_logout(
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
     return await user_logout_service(auth_response)
+
+
+@user_router.post("/v1/regenerate_token", response_model=MyResponse)
+async def regenerate_token(request: RegenerateTokenRequest):
+    return await regenerate_token_service(request)

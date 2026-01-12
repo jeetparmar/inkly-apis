@@ -11,6 +11,7 @@ from app.models.schema import (
     RegisterDeviceRequest,
     SendOTP,
     VerifyOTP,
+    RegenerateTokenRequest,
 )
 from app.utils.methods import (
     convert_iso_date_to_humanize,
@@ -555,6 +556,82 @@ async def user_verify_otp_service(verify_otp: VerifyOTP):
                 "username": saved_user.get("username"),
                 "user_id": saved_user.get("user_id"),
             },
+        },
+    )
+
+
+async def regenerate_token_service(request: RegenerateTokenRequest):
+    logger.info("user_service.regenerate_token_service")
+    logger.info(
+        f"Regenerating token for device {request.device_id} and user {request.user_id}"
+    )
+
+    # Check if user exists with this device
+    saved_user = await users_collection.find_one(
+        {"user_id": request.user_id, "devices.device_id": request.device_id}
+    )
+
+    if not saved_user:
+        # Check if it's a device-only user
+        saved_device_user = await user_devices_collection.find_one(
+            {"device_id": request.device_id, "user_id": request.user_id}
+        )
+        if not saved_device_user:
+            return create_exception_response(
+                400, NOT_FOUND.format(data="user/device record")
+            )
+
+        doc = saved_device_user
+        collection = user_devices_collection
+        query = {"_id": doc["_id"]}
+        update_query = {
+            "$set": {
+                "access_token": None,
+                "token_expire_at": None,
+            }
+        }  # Placeholder, will update below
+    else:
+        doc = saved_user
+        collection = users_collection
+        query = {"_id": doc["_id"], "devices.device_id": request.device_id}
+
+    # Generate new token
+    access_token = create_access_token(
+        data={"sub": request.device_id, "user_id": request.user_id}
+    )
+    expiry = token_expired_at(access_token)
+
+    # Update token in database
+    if saved_user:
+        await collection.update_one(
+            query,
+            {
+                "$set": {
+                    "devices.$.access_token": access_token,
+                    "devices.$.token_expire_at": expiry,
+                    "devices.$.logged_out_at": None,
+                }
+            },
+        )
+    else:
+        await collection.update_one(
+            query,
+            {
+                "$set": {
+                    "access_token": access_token,
+                    "token_expire_at": expiry,
+                    "logged_out_at": None,
+                }
+            },
+        )
+
+    return create_success_response(
+        200,
+        FETCHED_SUCCESS.format(data="token regenerated"),
+        result={
+            "access_token": access_token,
+            "token_expire_at": expiry,
+            "token_type": "bearer",
         },
     )
 
