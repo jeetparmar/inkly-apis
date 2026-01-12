@@ -10,7 +10,6 @@ class Settings(BaseSettings):
     mongo_details: str
     unsplash_url: str
     client_id: str
-    gemini_key: str
     gemini_model: str
 
     class Config:

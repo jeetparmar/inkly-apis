@@ -3,13 +3,15 @@ import re
 import google.generativeai as genai
 from app.utils.settings import settings
 
-# 3. Configure Gemini
-genai.configure(api_key=settings.gemini_key)  # 🔐 move to env variable in real projects
 
-# Use a text-capable Gemini model
-model = genai.GenerativeModel(settings.gemini_model)
-
-def ask_from_gemini(content_type = "story", content_about = "a little boy", content_size = 300, content_language = "english", content_theme = "fantasy"):
+def ask_from_gemini(
+    ai_key: str,
+    content_type="story",
+    content_about="a little boy",
+    content_size=300,
+    content_language="english",
+    content_theme="fantasy",
+) -> dict:
     content_prompt = f"""
     Write a {content_theme} {content_type} about {content_about}.
     The story should be approximately {content_size} words and written in {content_language}.
@@ -23,10 +25,15 @@ def ask_from_gemini(content_type = "story", content_about = "a little boy", cont
     - "content": the full story text
     - Do NOT include any explanation, markdown, or text outside the JSON object.
     """
+    # 3. Configure Gemini API key
+    genai.configure(api_key=ai_key)
+    # Use a text-capable Gemini model
+    model = genai.GenerativeModel(settings.gemini_model)
 
     # Generate content
     response = model.generate_content(content_prompt)
     return extract_json_from_llm(response.text)
+
 
 def extract_json_from_llm(text: str) -> dict:
     """

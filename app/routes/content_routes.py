@@ -35,6 +35,7 @@ async def fetch_related_images(auth_response: current_user_dependency, title: st
 @content_router.get("/v1/generate", response_model=MyResponse)
 async def generate_content_from_llm(
     auth_response: current_user_dependency,
+    ai_key: str,
     type: PostType,
     prompt: str,
     size: int,
@@ -46,6 +47,7 @@ async def generate_content_from_llm(
 
     return await generate_content_from_llm_service(
         auth_response.result["user_id"],
+        ai_key,
         type,
         prompt,
         theme,
