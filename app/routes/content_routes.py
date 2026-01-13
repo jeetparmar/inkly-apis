@@ -59,13 +59,14 @@ async def generate_content_from_llm(
 @content_router.get("/v1/posts", response_model=MyResponse)
 async def fetch_posts(
     auth_response: current_user_dependency,
-    type: Optional[PostType] = None,
+    types: Optional[list[PostType]] = Query(None),
+    search: Optional[str] = None,
     page: int = Query(1, gt=0),
     limit: int = Query(10, gt=0, le=100),
 ):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
-    return await fetch_posts_service(auth_response.result["user_id"], type, page, limit)
+    return await fetch_posts_service(auth_response.result["user_id"], types, search, page, limit)
 
 
 @content_router.get("/v1/user_posts", response_model=MyResponse)

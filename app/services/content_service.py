@@ -107,7 +107,7 @@ async def generate_content_from_llm_service(
 
 # ---------------- Posts Service ----------------
 async def fetch_posts_service(
-    login_user_id: str, type: PostType, page: int, limit: int
+    login_user_id: str, types: list[PostType], search: str, page: int, limit: int
 ):
     logger.info("content_service.fetch_posts_service")
 
@@ -119,10 +119,15 @@ async def fetch_posts_service(
     page = max(page, 1)
     limit = max(limit, 1)
     # ---------------- Query Stories ----------------
-    if type:
-        query = {"type": type, "is_draft": False}
-    else:
-        query = {"is_draft": False}
+    query = {"is_draft": False}
+    if types:
+        query["type"] = {"$in": types}
+    
+    if search:
+        query["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"content": {"$regex": search, "$options": "i"}},
+        ]
     total = await posts_collection.count_documents(query)
 
     cursor = (
