@@ -221,7 +221,8 @@ async def fetch_user_posts_service(
     login_user_id: str,
     user_id: str = None,
     is_draft: bool = False,
-    type: PostType = PostType.story,
+    types: PostType = None,
+    search: str = None,
     page: int = 1,
     limit: int = 10,
 ):
@@ -245,7 +246,15 @@ async def fetch_user_posts_service(
     limit = max(limit, 1)
 
     # ---------------- Query Stories ----------------
-    query = {"author.user_id": user_id, "type": type, "is_draft": is_draft}
+    query = {"author.user_id": user_id, "is_draft": is_draft}
+    if type:
+        query["type"] = types
+
+    if search:
+        query["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"content": {"$regex": search, "$options": "i"}},
+        ]
     total = await posts_collection.count_documents(query)
 
     cursor = (

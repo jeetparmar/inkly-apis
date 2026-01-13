@@ -72,7 +72,8 @@ async def fetch_posts(
 @content_router.get("/v1/user_posts", response_model=MyResponse)
 async def fetch_user_posts(
     auth_response: current_user_dependency,
-    type: PostType,
+    types: Optional[PostType] = Query(None),
+    search: Optional[str] = None,
     user_id: Optional[str] = None,
     is_draft: bool = False,
     page: int = Query(1, gt=0),
@@ -81,7 +82,7 @@ async def fetch_user_posts(
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
     return await fetch_user_posts_service(
-        auth_response.result["user_id"], user_id, is_draft, type, page, limit
+        auth_response.result["user_id"], user_id, is_draft, types, search, page, limit
     )
 
 
