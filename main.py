@@ -57,25 +57,38 @@ async def add_execution_time_header(request: Request, call_next):
 
 @app.on_event("startup")
 async def startup_event():
-    count = await interests_collection.count_documents({})
-    if count == 0:
+    # Sync interests from constants
+    try:
+        await interests_collection.delete_many({})
         interests_docs = [
             {"title": interest.get("title"), "icon": interest.get("icon")}
             for interest in INTERESTS_DATA
         ]
         await interests_collection.insert_many(interests_docs)
-        print("✅ Interests initialized")
-    else:
-        print("ℹ️ Interests already exist")
+        print("✅ Interests synchronized")
+    except Exception as e:
+        print(f"❌ Failed to sync interests: {e}")
 
     asyncio.create_task(otp_worker())
 
     # Create DB indexes
-    await create_device_id_index()
-    await create_user_id_index()
-    await create_post_view_index()
-    await create_post_heart_index()
-    await create_post_bookmark_index()
+    print("🏗️ Building database indexes...")
+    index_tasks = [
+        ("Device ID", create_device_id_index),
+        ("User ID", create_user_id_index),
+        ("Post View", create_post_view_index),
+        ("Post Heart", create_post_heart_index),
+        ("Post Bookmark", create_post_bookmark_index),
+    ]
+
+    for name, func in index_tasks:
+        try:
+            await func()
+            print(f"   ✅ {name} index created/verified")
+        except Exception as e:
+            print(f"   ⚠️ Failed to create {name} index: {e}")
+    
+    print("🚀 Startup process complete")
 
 
 # ---------------- Static Files ---------------- #

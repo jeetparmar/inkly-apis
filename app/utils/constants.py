@@ -1,21 +1,40 @@
 VALID_PLATFORMS = {"ios", "android"}
 INTERESTS_DATA = [
-    {"title": "Technology", "icon": "phone-portrait"},
-    {"title": "Sports", "icon": "football"},
-    {"title": "Music", "icon": "musical-notes"},
-    {"title": "Travel", "icon": "airplane"},
-    {"title": "Food & Cooking", "icon": "restaurant"},
-    {"title": "Movies & TV", "icon": "film"},
-    {"title": "Books & Reading", "icon": "library"},
-    {"title": "Fitness & Health", "icon": "fitness"},
-    {"title": "Gaming", "icon": "game-controller"},
-    {"title": "Art & Design", "icon": "color-palette"},
-    {"title": "Fashion", "icon": "shirt"},
-    {"title": "Photography", "icon": "camera"},
-    {"title": "Science", "icon": "flask"},
-    {"title": "Business", "icon": "briefcase"},
-    {"title": "Nature & Outdoors", "icon": "leaf"},
-    {"title": "Pets & Animals", "icon": "paw"},
+    # Stories
+    {"title": "Horror Stories", "icon": "skull"},
+    {"title": "Mystery Stories", "icon": "search"},
+    {"title": "Romantic Stories", "icon": "heart"},
+    {"title": "Sci-Fi Stories", "icon": "planet"},
+    
+    # Jokes
+    {"title": "Funny Jokes", "icon": "happy"},
+    {"title": "Dark Humor", "icon": "moon"},
+    {"title": "Sarcastic Jokes", "icon": "invert-mode"},
+    
+    # Poems
+    {"title": "Classic Poetry", "icon": "feather"},
+    {"title": "Modern Verse", "icon": "brush"},
+    {"title": "Haikus", "icon": "leaf"},
+    
+    # Quotes
+    {"title": "Inspirational Quotes", "icon": "star"},
+    {"title": "Motivational Quotes", "icon": "rocket"},
+    {"title": "Philosophical Quotes", "icon": "infinite"},
+    
+    # Facts
+    {"title": "Science Facts", "icon": "flask"},
+    {"title": "History Facts", "icon": "library"},
+    {"title": "Nature Facts", "icon": "earth"},
+    
+    # Riddles
+    {"title": "Logic Riddles", "icon": "extension-puzzle"},
+    {"title": "Brain Teasers", "icon": "bulb"},
+    {"title": "Mystery Riddles", "icon": "help-buoy"},
+    
+    # Articles
+    {"title": "Tech Articles", "icon": "code-slash"},
+    {"title": "Health Articles", "icon": "medkit"},
+    {"title": "Business Articles", "icon": "briefcase"},
 ]
 MAIL_SUBJECT = "Here is your Login OTP from Inkly."
 MAIL_SMTP_HOST = "smtp.gmail.com"
