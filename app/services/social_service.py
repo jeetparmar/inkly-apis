@@ -1,6 +1,10 @@
 import logging
 from datetime import datetime, timezone
-from app.config.database.mongo import users_collection, users_connections_collection
+from app.config.database.mongo import (
+    users_collection,
+    users_connections_collection,
+    points_collection,
+)
 from app.utils.methods import (
     convert_iso_date_to_humanize,
     create_exception_response,
@@ -46,6 +50,9 @@ async def fetch_followers_service(login_user_id, user_id, page, limit):
             connections.append(
                 {
                     "user_id": follower_user["user_id"],
+                    "username": follower_user["username"],
+                    "name": follower_user["name"],
+                    "avatar": follower_user["avatar"],
                     "total_followers": follower_user.get("total_followers", 0),
                     "followed_at": result["followed_at"],
                     "followed_at_readable": convert_iso_date_to_humanize(
@@ -92,6 +99,9 @@ async def fetch_following_service(login_user_id, user_id, page, limit):
             connections.append(
                 {
                     "user_id": following_user["user_id"],
+                    "username": following_user["username"],
+                    "name": following_user["name"],
+                    "avatar": following_user["avatar"],
                     "total_followers": following_user.get("total_followers", 0),
                     "followed_at": result["followed_at"],
                     "followed_at_readable": convert_iso_date_to_humanize(
@@ -148,10 +158,27 @@ async def save_follow_service(login_user_id, user_id):
         await update_user_object(
             user["_id"], {"total_followers": user.get("total_followers", 0) + 1}
         )
+        # Reward points
+        points = 10
+        await points_collection.insert_one(
+            {
+                "user_id": login_user_id,
+                "following_id": user["user_id"],
+                "type": "earned",
+                "icon": "👤",
+                "points": points,
+                "reason": "Followed user",
+                "created_at": datetime.now(timezone.utc),
+            }
+        )
+        await users_collection.update_one(
+            {"user_id": login_user_id},
+            {"$inc": {"total_points": points}},
+        )
         saved_user: User = await users_collection.find_one({"user_id": login_user_id})
         return create_success_response(
             200,
-            ACTION_SUCCESS.format(data=f"{user_id} follow"),
+            ACTION_SUCCESS.format(data=f"{user['username']} follow"),
             result={
                 "total_follower": saved_user.get("total_followers", 0),
                 "total_following": saved_user.get("total_following", 0),
@@ -196,10 +223,31 @@ async def save_unfollow_service(login_user_id, user_id):
         await update_user_object(
             user["_id"], {"total_followers": max(0, user.get("total_followers", 0) - 1)}
         )
+        # Deduct points
+        points = 10
+        await points_collection.delete_one(
+            {
+                "user_id": login_user_id,
+                "following_id": user["user_id"],
+                "reason": "Followed user",
+            }
+        )
+        await users_collection.update_one(
+            {"user_id": login_user_id},
+            [
+                {
+                    "$set": {
+                        "total_points": {
+                            "$max": [{"$subtract": ["$total_points", points]}, 0]
+                        }
+                    }
+                }
+            ],
+        )
         saved_user: User = await users_collection.find_one({"user_id": login_user_id})
         return create_success_response(
             200,
-            ACTION_SUCCESS.format(data=f"{user_id} unfollow"),
+            ACTION_SUCCESS.format(data=f"{user['username']} unfollow"),
             result={
                 "total_follower": saved_user.get("total_followers", 0),
                 "total_following": saved_user.get("total_following", 0),

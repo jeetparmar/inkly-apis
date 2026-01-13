@@ -30,6 +30,7 @@ from app.config.database.mongo import (
     posts_hearts_collection,
     posts_comments_collection,
     posts_bookmarks_collection,
+    users_connections_collection
 )
 from app.utils.settings import settings
 
@@ -163,6 +164,15 @@ async def fetch_posts_service(
         ).to_list(None)
     }
 
+    post_user_ids = [s["author"]["user_id"] for s in raw_posts]
+
+    user_followings = {
+        f["following_id"]: True
+        for f in await users_connections_collection.find(
+            {"follower_id": login_user_id, "following_id": {"$in": post_user_ids}}
+        ).to_list(None)
+    }
+
     # ---------------- Format Response ----------------
     posts = []
     for post in raw_posts:
@@ -192,7 +202,7 @@ async def fetch_posts_service(
                     "name": name,
                     "username": username,
                     "avatar": avatar,
-                    "is_following": False,
+                    "is_following": user_followings.get(post_user_id, False),
                     "is_verified": False,
                 },
                 "is_hearted": user_hearts.get(post_id, False),
@@ -627,6 +637,24 @@ async def toggle_heart_service(login_user_id: str, post_id: str):
                 {"$inc": {"stats.hearts": 1}},
                 return_document=ReturnDocument.AFTER,
             )
+            # Reward points
+            points = 5
+            now = datetime.now(timezone.utc)
+            await points_collection.insert_one(
+                {
+                    "user_id": login_user_id,
+                    "post_id": post_oid,
+                    "type": "earned",
+                    "icon": "❤️",
+                    "points": points,
+                    "reason": "Hearted post",
+                    "created_at": now,
+                }
+            )
+            await users_collection.update_one(
+                {"user_id": login_user_id},
+                {"$inc": {"total_points": points}},
+            )
             action = "added"
         else:
             # Already exists, remove heart
@@ -647,6 +675,27 @@ async def toggle_heart_service(login_user_id: str, post_id: str):
                         }
                     ],
                     return_document=ReturnDocument.AFTER,
+                )
+                # Deduct points
+                points = 5
+                await points_collection.delete_one(
+                    {
+                        "user_id": login_user_id,
+                        "post_id": post_oid,
+                        "reason": "Hearted post",
+                    }
+                )
+                await users_collection.update_one(
+                    {"user_id": login_user_id},
+                    [
+                        {
+                            "$set": {
+                                "total_points": {
+                                    "$max": [{"$subtract": ["$total_points", points]}, 0]
+                                }
+                            }
+                        }
+                    ],
                 )
                 action = "removed"
             else:
