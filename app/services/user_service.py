@@ -31,6 +31,7 @@ from app.config.database.mongo import (
     users_collection,
     interests_collection,
     user_devices_collection,
+    users_connections_collection,
     email_config_collection,
 )
 from app.utils.constants import (
@@ -345,9 +346,20 @@ async def fetch_user_profile_service(login_user_id: str, user_id: str):
 
     saved_user = await users_collection.find_one({"user_id": target_user_id})
     if not saved_user:
-        return create_exception_response(400, INVALID_DATA.format(data="username"))
+        return create_exception_response(
+            400, INVALID_DATA.format(data="username")
+        )
 
     interest_ids = saved_user.get("interests") or []
+
+    is_following = False
+    if login_user_id != target_user_id:
+        is_following = await users_connections_collection.count_documents(
+            {
+                "follower_id": login_user_id,
+                "following_id": target_user_id,
+            }
+        ) > 0
 
     result = {
         "user_id": saved_user.get("user_id"),
@@ -365,11 +377,13 @@ async def fetch_user_profile_service(login_user_id: str, user_id: str):
         "total_points": saved_user.get("total_points", 0),
         "total_followers": saved_user.get("total_followers", 0),
         "total_following": saved_user.get("total_following", 0),
-        "total_points": saved_user.get("total_points", 0),
+        "is_following": is_following,
     }
 
     return create_success_response(
-        200, FETCHED_SUCCESS.format(data="user"), result=result
+        200,
+        FETCHED_SUCCESS.format(data="user"),
+        result=result,
     )
 
 
