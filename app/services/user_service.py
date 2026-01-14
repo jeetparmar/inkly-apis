@@ -307,14 +307,14 @@ async def register_device_service(request: RegisterDeviceRequest):
     )
 
 
-async def fetch_user_points_service(user_id: str):
+async def fetch_user_points_service(user_id: str, page: int, limit: int):
     logger.info("user_service.fetch_user_points_service")
     saved_user = await users_collection.find_one({"user_id": user_id})
     if not saved_user:
         return create_exception_response(404, NOT_FOUND.format(data="user"))
 
     total_points = saved_user.get("total_points", 0)
-    results = points_collection.find({"user_id": user_id}).sort("created_at", -1)
+    results = points_collection.find({"user_id": user_id}).sort("created_at", -1).skip((page - 1) * limit).limit(limit)
     activities = []
     async for result in results:
         activities.append(
@@ -332,6 +332,7 @@ async def fetch_user_points_service(user_id: str):
     return create_success_response(
         200,
         FETCHED_SUCCESS.format(data="user points"),
+        query={"page": page, "limit": limit},
         result={"total_points": total_points},
         results=activities,
     )

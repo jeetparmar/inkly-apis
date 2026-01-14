@@ -1,5 +1,5 @@
 from typing import Annotated, Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from app.services.user_service import (
     fetch_prefrences_service,
     fetch_user_points_service,
@@ -52,10 +52,11 @@ async def register_device(request: RegisterDeviceRequest):
 
 
 @user_router.get("/v1/points")
-async def fetch_points(auth_response: current_user_dependency):
+async def fetch_points(auth_response: current_user_dependency, page: int = Query(1, gt=0),
+    limit: int = Query(10, gt=0, le=100)):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
-    return await fetch_user_points_service(auth_response.result["user_id"])
+    return await fetch_user_points_service(auth_response.result["user_id"], page, limit)
 
 
 @user_router.get("/v1/profile")
