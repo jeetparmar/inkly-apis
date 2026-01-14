@@ -15,6 +15,7 @@ from app.services.content_service import (
     save_comment_service,
     fetch_comments_service,
 )
+from app.utils.enums.PostFilters import PostDuration, PostSortBy, PostFilter
 from app.models.schema import CommentText, MyResponse, PostRequest
 from app.utils.enums.PostType import PostType
 from app.utils.enums.ResponseStatus import ResponseStatus
@@ -62,12 +63,26 @@ async def fetch_posts(
     auth_response: current_user_dependency,
     types: Optional[list[PostType]] = Query(None),
     search: Optional[str] = None,
+    filter: Optional[PostFilter] = PostFilter.NONE,
+    user_id: Optional[str] = None,
+    duration: Optional[PostDuration] = PostDuration.ALL_TIME,
+    sort_by: Optional[PostSortBy] = PostSortBy.NEWEST,
     page: int = Query(1, gt=0),
     limit: int = Query(10, gt=0, le=100),
 ):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
-    return await fetch_posts_service(auth_response.result["user_id"], types, search, page, limit)
+    return await fetch_posts_service(
+        auth_response.result["user_id"],
+        types,
+        search,
+        filter,
+        user_id,
+        duration,
+        sort_by,
+        page,
+        limit,
+    )
 
 
 @content_router.get("/v1/user_posts", response_model=MyResponse)

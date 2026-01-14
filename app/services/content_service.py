@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import logging
 import re
 import json
@@ -9,6 +9,7 @@ import httpx
 from pymongo import ReturnDocument
 from app.models.schema import PostRequest
 from app.utils.enums.PostType import PostType
+from app.utils.enums.PostFilters import PostDuration, PostSortBy, PostFilter
 from app.utils.gemini import ask_from_gemini
 from app.utils.methods import (
     convert_iso_date_to_humanize,
@@ -108,7 +109,15 @@ async def generate_content_from_llm_service(
 
 # ---------------- Posts Service ----------------
 async def fetch_posts_service(
-    login_user_id: str, types: list[PostType], search: str, page: int, limit: int
+    login_user_id: str,
+    types: list[PostType],
+    search: str,
+    filter: PostFilter = PostFilter.NONE,
+    user_id: str = None,
+    duration: PostDuration = PostDuration.ALL_TIME,
+    sort_by: PostSortBy = PostSortBy.NEWEST,
+    page: int = 1,
+    limit: int = 10,
 ):
     logger.info("content_service.fetch_posts_service")
 
@@ -129,11 +138,47 @@ async def fetch_posts_service(
             {"title": {"$regex": search, "$options": "i"}},
             {"content": {"$regex": search, "$options": "i"}},
         ]
+
+    # ---------------- Filter by Duration ----------------
+    if duration and duration != PostDuration.ALL_TIME:
+        now = datetime.now(timezone.utc)
+        if duration == PostDuration.LAST_24H:
+            query["created_at"] = {"$gte": now - timedelta(days=1)}
+        elif duration == PostDuration.LAST_7D:
+            query["created_at"] = {"$gte": now - timedelta(days=7)}
+        elif duration == PostDuration.LAST_30D:
+            query["created_at"] = {"$gte": now - timedelta(days=30)}
+
+    # ---------------- Filter by Source ----------------
+    if filter == PostFilter.FOLLOWING:
+        followings = await users_connections_collection.find(
+            {"follower_id": login_user_id}
+        ).to_list(None)
+        following_ids = [f["following_id"] for f in followings]
+        query["author.user_id"] = {"$in": following_ids}
+    elif filter == PostFilter.FOLLOWERS:
+        followers = await users_connections_collection.find(
+            {"following_id": login_user_id}
+        ).to_list(None)
+        follower_ids = [f["follower_id"] for f in followers]
+        query["author.user_id"] = {"$in": follower_ids}
+    elif filter == PostFilter.USER and user_id:
+        query["author.user_id"] = user_id
+
+    # ---------------- Sorting ----------------
+    sort_field = "created_at"
+    if sort_by == PostSortBy.MOST_VIEWED:
+        sort_field = "stats.views"
+    elif sort_by == PostSortBy.MOST_HEARTED:
+        sort_field = "stats.hearts"
+    elif sort_by == PostSortBy.MOST_COMMENTED:
+        sort_field = "stats.comments"
+
     total = await posts_collection.count_documents(query)
 
     cursor = (
         posts_collection.find(query)
-        .sort("created_at", -1)
+        .sort(sort_field, -1)
         .skip((page - 1) * limit)
         .limit(limit)
     )
