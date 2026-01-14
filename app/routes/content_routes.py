@@ -11,6 +11,7 @@ from app.services.content_service import (
     delete_comment_service,
     toggle_bookmark_service,
     toggle_heart_service,
+    fetch_heart_service,
     save_comment_service,
     fetch_comments_service,
 )
@@ -129,6 +130,14 @@ async def save_heart(auth_response: current_user_dependency, post_id: str):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
     return await toggle_heart_service(auth_response.result["user_id"], post_id)
+
+
+@content_router.get("/v1/hearts/{post_id}", response_model=MyResponse)
+async def fetch_hearts(auth_response: current_user_dependency, post_id: str, page: int = Query(1, gt=0),
+    limit: int = Query(10, gt=0, le=100)):
+    if auth_response.status == ResponseStatus.FAILURE:
+        return auth_response
+    return await fetch_heart_service(auth_response.result["user_id"], post_id, page, limit)
 
 
 @content_router.get("/v1/comments/{post_id}")

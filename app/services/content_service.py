@@ -718,6 +718,86 @@ async def toggle_heart_service(login_user_id: str, post_id: str):
         return create_exception_response(500, f"An unexpected error occurred: {str(e)}")
 
 
+async def fetch_heart_service(
+    login_user_id: str, post_id: str, page: int = 1, limit: int = 10
+):
+    logger.info("content_service.fetch_heart_service")
+    try:
+        saved_user, error = await get_verified_user(login_user_id)
+        if error:
+            return error
+
+        try:
+            post_oid = ObjectId(post_id)
+        except Exception:
+            return create_exception_response(400, "Invalid post_id")
+
+        # Check if post exists
+        post = await posts_collection.find_one({"_id": post_oid})
+        if not post:
+            return create_exception_response(404, NOT_FOUND.format(data="Post"))
+
+        # Count total hearts
+        total_hearts = await posts_hearts_collection.count_documents(
+            {"post_id": post_oid}
+        )
+
+        # Fetch hearts
+        cursor = (
+            posts_hearts_collection.find({"post_id": post_oid})
+            .sort("hearted_at", -1)
+            .skip((page - 1) * limit)
+            .limit(limit)
+        )
+
+        raw_hearts = await cursor.to_list(length=limit)
+
+        post_user_ids = [s["user_id"] for s in raw_hearts]
+
+        # Batch fetch followers
+        user_followings = {
+            f["following_id"]: True
+            for f in await users_connections_collection.find(
+                {"follower_id": login_user_id, "following_id": {"$in": post_user_ids}}
+            ).to_list(None)
+        }
+
+        # Batch fetch users
+        users_cursor = users_collection.find({"user_id": {"$in": post_user_ids}})
+        users_map = {u["user_id"]: u async for u in users_cursor}
+
+        hearts = []
+        for heart in raw_hearts:
+            uid = heart["user_id"]
+            hearted_user = users_map.get(uid, {})
+
+            heart_item = {
+                "heart_id": str(heart.get("_id")),
+                "user_id": uid,
+                "username": hearted_user.get("username", "unknown"),
+                "name": hearted_user.get("name", "Unknown"),
+                "user_avatar": hearted_user.get(
+                    "avatar", "https://i.pravatar.cc/300?img=3"
+                ),
+                "is_following": user_followings.get(uid, False),
+                "hearted_at_readable": convert_iso_date_to_humanize(
+                    heart.get("hearted_at")
+                ),
+            }
+            hearts.append(heart_item)
+
+        return create_success_response(
+            200,
+            ACTION_SUCCESS.format(data="Hearts fetched successfully"),
+            results=hearts,
+            total=total_hearts,
+            page=page,
+            limit=limit,
+        )
+    except Exception as e:
+        logger.exception("Error in fetch_heart_service")
+        return create_exception_response(500, f"An unexpected error occurred: {str(e)}")
+
 async def fetch_comments_service(
     login_user_id: str, post_id: str, page: int = 1, limit: int = 10
 ):
@@ -750,22 +830,33 @@ async def fetch_comments_service(
             .limit(limit)
         )
 
+        raw_comments = await cursor.to_list(length=limit)
+        comment_user_ids = [c["user_id"] for c in raw_comments]
+
+        # Batch fetch users
+        users_cursor = users_collection.find({"user_id": {"$in": comment_user_ids}})
+        users_map = {u["user_id"]: u async for u in users_cursor}
+
         comments = []
-        async for comment in cursor:
-            comment_user = await users_collection.find_one(
-                {"user_id": comment.get("user_id")}
-            )
-            comment["comment_id"] = str(comment.pop("_id"))
-            comment["username"] = comment_user.get("username", "unknown")
-            comment["name"] = comment_user.get("name", "Unknown")
-            comment["user_avatar"] = comment_user.get(
-                "avatar", "https://i.pravatar.cc/300?img=3"
-            )
-            comment["post_id"] = str(comment["post_id"])
-            comment["created_at_readable"] = convert_iso_date_to_humanize(
-                comment.get("created_at")
-            )
-            comments.append(comment)
+        for comment in raw_comments:
+            uid = comment["user_id"]
+            comment_user = users_map.get(uid, {})
+
+            comment_item = {
+                "comment_id": str(comment.get("_id")),
+                "user_id": uid,
+                "comment_text": comment.get("comment_text"),
+                "username": comment_user.get("username", "unknown"),
+                "name": comment_user.get("name", "Unknown"),
+                "user_avatar": comment_user.get(
+                    "avatar", "https://i.pravatar.cc/300?img=3"
+                ),
+                "post_id": str(comment["post_id"]),
+                "created_at_readable": convert_iso_date_to_humanize(
+                    comment.get("created_at")
+                ),
+            }
+            comments.append(comment_item)
 
         return create_success_response(
             200,

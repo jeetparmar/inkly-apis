@@ -38,6 +38,12 @@ async def fetch_followers_service(login_user_id, user_id, page, limit):
                     400, INVALID_DATA.format(data="user_id")
                 )
         connections = []
+        user_followings = {
+            f["following_id"]: True
+            for f in await users_connections_collection.find(
+                {"follower_id": login_user_id}
+            ).to_list(None)
+        }
         async for result in (
             users_connections_collection.find({"following_id": saved_user["user_id"]})
             .skip((page - 1) * limit)
@@ -54,6 +60,7 @@ async def fetch_followers_service(login_user_id, user_id, page, limit):
                     "name": follower_user["name"],
                     "avatar": follower_user["avatar"],
                     "total_followers": follower_user.get("total_followers", 0),
+                    "is_following": user_followings.get(result["follower_id"], False),
                     "followed_at": result["followed_at"],
                     "followed_at_readable": convert_iso_date_to_humanize(
                         str(result["followed_at"])
@@ -76,26 +83,40 @@ async def fetch_followers_service(login_user_id, user_id, page, limit):
 async def fetch_following_service(login_user_id, user_id, page, limit):
     logger.info("social_service.fetch_following_service")
     logger.info("Fetching following for user_id: %s", user_id)
+
     try:
         saved_user, error = await get_verified_user(login_user_id)
         if error:
             return error
+
         if user_id:
             saved_user = await users_collection.find_one({"user_id": user_id})
             if not saved_user:
                 return create_exception_response(
                     400, INVALID_DATA.format(data="user_id")
                 )
+
+        # users that login_user_id follows
+        user_followings = {
+            f["following_id"]: True
+            for f in await users_connections_collection.find(
+                {"follower_id": login_user_id}
+            ).to_list(None)
+        }
+
         connections = []
+
         async for result in (
             users_connections_collection.find({"follower_id": saved_user["user_id"]})
             .skip((page - 1) * limit)
             .limit(limit)
         ):
             result.pop("_id", None)
+
             following_user = await users_collection.find_one(
                 {"user_id": result["following_id"]}
             )
+
             connections.append(
                 {
                     "user_id": following_user["user_id"],
@@ -103,23 +124,33 @@ async def fetch_following_service(login_user_id, user_id, page, limit):
                     "name": following_user["name"],
                     "avatar": following_user["avatar"],
                     "total_followers": following_user.get("total_followers", 0),
+
+                    # ✅ FIXED
+                    "is_following": user_followings.get(
+                        following_user["user_id"], False
+                    ),
+
                     "followed_at": result["followed_at"],
                     "followed_at_readable": convert_iso_date_to_humanize(
                         str(result["followed_at"])
                     ),
                 }
             )
+
         total = await users_connections_collection.count_documents(
             {"follower_id": saved_user["user_id"]}
         )
+
         return create_success_response(
             200,
             FETCHED_SUCCESS.format(data="following"),
             total=total,
             results=connections,
         )
+
     except Exception as e:
         return create_exception_response(500, f"An unexpected error occurred: {str(e)}")
+
 
 
 async def save_follow_service(login_user_id, user_id):
