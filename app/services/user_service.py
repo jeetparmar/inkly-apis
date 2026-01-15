@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import logging
 import random
 import uuid
-
+import re
 from bson import ObjectId
 from app.queue.in_memory import enqueue_otp_task
 from app.config.auth.token import create_access_token
@@ -728,4 +728,49 @@ async def update_user_object(id, set):
     await users_collection.update_one(
         {"_id": id},
         {"$set": set},
+    )
+
+
+async def fetch_users_service(search: str, page: int, limit: int, current_user_id: str):
+    logger.info("user_service.fetch_users_service")
+
+    page = max(page, 1)
+    limit = min(max(limit, 1), 50)
+
+    if not search:
+        return create_success_response(
+            200, FETCHED_SUCCESS.format(data="users"), results=[]
+        )
+
+    escaped = re.escape(search)
+    regex_pattern = {"$regex": escaped, "$options": "i"}
+
+    query = {
+        "$or": [
+            {"username": regex_pattern},
+            {"name": regex_pattern},
+            {"email": regex_pattern},
+        ],
+        "user_id": {"$ne": current_user_id},
+    }
+
+    cursor = (
+        users_collection.find(query)
+        .sort("created_at", -1)
+        .skip((page - 1) * limit)
+        .limit(limit)
+    )
+    users = [
+        {
+            "user_id": user.get("user_id"),
+            "name": user.get("name", ""),
+            "username": user.get("username"),
+            "avatar": user.get("avatar", ""),
+            "total_followers": user.get("total_followers", 0),
+        }
+        async for user in cursor
+    ]
+
+    return create_success_response(
+        200, FETCHED_SUCCESS.format(data="users"), results=users
     )

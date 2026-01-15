@@ -162,7 +162,7 @@ async def fetch_posts_service(
         ).to_list(None)
         follower_ids = [f["follower_id"] for f in followers]
         query["author.user_id"] = {"$in": follower_ids}
-    elif filter == PostFilter.USER and user_id:
+    elif user_id:
         query["author.user_id"] = user_id
 
     # ---------------- Sorting ----------------

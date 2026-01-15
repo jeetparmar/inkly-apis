@@ -12,6 +12,7 @@ from app.services.user_service import (
     user_verify_otp_service,
     user_logout_service,
     regenerate_token_service,
+    fetch_users_service,
 )
 from app.utils.enums.ResponseStatus import ResponseStatus
 from app.config.auth.dependencies import get_current_user
@@ -99,3 +100,17 @@ async def user_logout(
 @user_router.post("/v1/regenerate_token", response_model=MyResponse)
 async def regenerate_token(request: RegenerateTokenRequest):
     return await regenerate_token_service(request)
+
+
+@user_router.get("/v1/search")
+async def fetch_users(
+    auth_response: current_user_dependency,
+    search: str = Query(..., min_length=0),
+    page: int = Query(1, gt=0),
+    limit: int = Query(10, gt=0, le=100),
+):
+    if auth_response.status == ResponseStatus.FAILURE:
+        return auth_response
+    return await fetch_users_service(
+        search, page, limit, auth_response.result["user_id"]
+    )

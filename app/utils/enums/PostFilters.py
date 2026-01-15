@@ -15,5 +15,4 @@ class PostSortBy(str, Enum):
 class PostFilter(str, Enum):
     FOLLOWING = "following"
     FOLLOWERS = "followers"
-    USER = "user"
     NONE = "none"
