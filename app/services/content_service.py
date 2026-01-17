@@ -1025,6 +1025,7 @@ async def delete_comment_service(login_user_id: str, comment_id: str):
             {
                 "user_id": login_user_id,
                 "post_id": post_oid,
+                "source_id": comment_oid,
             }
         )
         return create_success_response(

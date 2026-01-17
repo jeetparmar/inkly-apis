@@ -569,7 +569,31 @@ async def user_verify_otp_service(verify_otp: VerifyOTP):
         return_document=True
     )
     
+    # Award 50 points for registration if not already awarded
+    registration_points = 50
+    already_awarded = await points_collection.find_one({
+        "user_id": saved_user.get("user_id"),
+        "reason": "Registration bonus"
+    })
+    
+    if not already_awarded:
+        now = datetime.now(timezone.utc)
+        await users_collection.update_one(
+            {"user_id": saved_user.get("user_id")},
+            {"$inc": {"total_points": registration_points}}
+        )
+        await points_collection.insert_one({
+            "user_id": saved_user.get("user_id"),
+            "type": "earned",
+            "icon": "🎉",
+            "points": registration_points,
+            "reason": "Registration bonus",
+            "created_at": now
+        })
+        # Re-fetch user to get updated points if needed (though not strictly necessary for the response below)
+
     # Generate referral codes if not present
+
     if not saved_user.get("referral_codes"):
         await generate_referral_codes_service(saved_user.get("user_id"), 5)
         # Re-fetch user to get the codes
