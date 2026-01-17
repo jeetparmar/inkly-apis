@@ -42,3 +42,12 @@ async def create_post_bookmark_index():
     await posts_bookmarks_collection.create_index(
         [("user_id", 1), ("post_id", 1)], unique=True
     )
+
+
+user_notifications_collection = database.get_collection("user_notifications")
+
+
+async def create_user_notifications_index():
+    await user_notifications_collection.create_index(
+        [("user_id", 1), ("created_at", -1)]
+    )

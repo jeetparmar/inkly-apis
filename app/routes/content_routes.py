@@ -15,6 +15,7 @@ from app.services.content_service import (
     save_comment_service,
     fetch_comments_service,
     fetch_bookmarks_service,
+    fetch_user_notifications_service,
 )
 from app.utils.enums.PostFilters import PostDuration, PostSortBy, PostFilter
 from app.models.schema import CommentText, MyResponse, PostRequest
@@ -197,3 +198,16 @@ async def delete_comment(auth_response: current_user_dependency, comment_id: str
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
     return await delete_comment_service(auth_response.result["user_id"], comment_id)
+
+
+@content_router.get("/v1/notifications", response_model=MyResponse)
+async def fetch_notifications(
+    auth_response: current_user_dependency,
+    page: int = Query(1, gt=0),
+    limit: int = Query(10, gt=0, le=100),
+):
+    if auth_response.status == ResponseStatus.FAILURE:
+        return auth_response
+    return await fetch_user_notifications_service(
+        auth_response.result["user_id"], page, limit
+    )

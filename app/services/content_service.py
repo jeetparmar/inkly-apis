@@ -31,7 +31,8 @@ from app.config.database.mongo import (
     posts_hearts_collection,
     posts_comments_collection,
     posts_bookmarks_collection,
-    users_connections_collection
+    users_connections_collection,
+    user_notifications_collection
 )
 from app.utils.settings import settings
 
@@ -778,6 +779,19 @@ async def toggle_heart_service(login_user_id: str, post_id: str):
                 {"user_id": login_user_id},
                 {"$inc": {"total_points": points}},
             )
+            # Add notification
+            post_owner_id = result.get("author", {}).get("user_id")
+            if post_owner_id and post_owner_id != login_user_id:
+                notification_data = {
+                    "user_id": post_owner_id,
+                    "actor_id": login_user_id,
+                    "post_id": post_oid,
+                    "type": "heart",
+                    "message": f"{saved_user.get('name', 'Someone')} hearted your post",
+                    "is_read": False,
+                    "created_at": now,
+                }
+                await user_notifications_collection.insert_one(notification_data)
             action = "added"
         else:
             # Already exists, remove heart
@@ -1046,6 +1060,20 @@ async def save_comment_service(login_user_id: str, post_id: str, comment_text: s
             {"user_id": login_user_id},
             {"$inc": {"total_points": points}},
         )
+        # Add notification
+        post_owner_id = post.get("author", {}).get("user_id")
+        if post_owner_id and post_owner_id != login_user_id:
+            notification_data = {
+                "user_id": post_owner_id,
+                "actor_id": login_user_id,
+                "post_id": post_oid,
+                "comment_id": comment_data["_id"],
+                "type": "comment",
+                "message": f"{saved_user.get('name', 'Someone')} commented on your post",
+                "is_read": False,
+                "created_at": now,
+            }
+            await user_notifications_collection.insert_one(notification_data)
         return create_success_response(
             200,
             ACTION_SUCCESS.format(data="Comment added"),
@@ -1137,4 +1165,76 @@ async def delete_comment_service(login_user_id: str, comment_id: str):
 
     except Exception as e:
         logger.exception("Error in delete_comment_service")
+        return create_exception_response(500, f"An unexpected error occurred: {str(e)}")
+
+
+async def fetch_user_notifications_service(
+    login_user_id: str,
+    page: int = 1,
+    limit: int = 10,
+):
+    logger.info("content_service.fetch_user_notifications_service")
+    try:
+        saved_user, error = await get_verified_user(login_user_id)
+        if error:
+            return error
+
+        page = max(page, 1)
+        limit = max(limit, 1)
+
+        query = {"user_id": login_user_id}
+        total = await user_notifications_collection.count_documents(query)
+
+        cursor = (
+            user_notifications_collection.find(query)
+            .sort("created_at", -1)
+            .skip((page - 1) * limit)
+            .limit(limit)
+        )
+
+        raw_notifications = await cursor.to_list(length=limit)
+
+        actor_ids = list(set(doc.get("actor_id") for doc in raw_notifications if doc.get("actor_id")))
+        post_ids = list(set(doc.get("post_id") for doc in raw_notifications if doc.get("post_id")))
+
+        actors = {u["user_id"]: u async for u in users_collection.find({"user_id": {"$in": actor_ids}})}
+        posts = {p["_id"]: p async for p in posts_collection.find({"_id": {"$in": post_ids}})}
+
+        results = []
+        for doc in raw_notifications:
+            actor_id = doc.get("actor_id")
+            actor = actors.get(actor_id)
+            
+            post_id = doc.get("post_id")
+            post = posts.get(post_id)
+            
+            results.append({
+                "id": str(doc["_id"]),
+                "type": doc.get("type"),
+                "message": doc.get("message"),
+                "is_read": doc.get("is_read", False),
+                "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+                "created_at_readable": convert_iso_date_to_humanize(doc.get("created_at")),
+                "actor": {
+                    "user_id": actor_id,
+                    "name": actor.get("name") if actor else "Unknown",
+                    "avatar": actor.get("avatar") if actor else "https://i.pravatar.cc/300?img=3",
+                },
+                "post": {
+                    "id": str(post_id),
+                    "title": post.get("title") if post else "",
+                    "type": post.get("type") if post else "",
+                }
+            })
+
+        return create_success_response(
+            200,
+            FETCHED_SUCCESS.format(data="notifications"),
+            results=results,
+            total=total,
+            page=page,
+            limit=limit,
+        )
+    except Exception as e:
+        logger.exception("Error in fetch_user_notifications_service")
         return create_exception_response(500, f"An unexpected error occurred: {str(e)}")
