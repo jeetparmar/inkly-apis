@@ -74,3 +74,8 @@ class User(BaseModel):
 class RegenerateTokenRequest(BaseModel):
     device_id: str
     user_id: str
+
+
+class RedeemReferralCodeRequest(BaseModel):
+    referral_code: str
+

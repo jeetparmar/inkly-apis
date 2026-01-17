@@ -13,6 +13,8 @@ from app.services.user_service import (
     user_logout_service,
     regenerate_token_service,
     fetch_users_service,
+    generate_referral_codes_service,
+    redeem_referral_code_service,
 )
 from app.utils.enums.ResponseStatus import ResponseStatus
 from app.config.auth.dependencies import get_current_user
@@ -23,7 +25,10 @@ from app.models.schema import (
     SendOTP,
     UserProfileUpdateRequest,
     VerifyOTP,
+    UserProfileUpdateRequest,
+    VerifyOTP,
     RegenerateTokenRequest,
+    RedeemReferralCodeRequest,
 )
 
 user_router = APIRouter()
@@ -114,3 +119,33 @@ async def fetch_users(
     return await fetch_users_service(
         search, page, limit, auth_response.result["user_id"]
     )
+
+
+@user_router.post("/v1/referral/generate")
+async def generate_referral_code(
+    auth_response: current_user_dependency,
+    count: int = Query(1, gt=0, le=5)
+):
+    if auth_response.status == ResponseStatus.FAILURE:
+        return auth_response
+    
+    codes = await generate_referral_codes_service(auth_response.result["user_id"], count)
+    
+    from app.utils.messages import REFERRAL_CODE_GENERATED, FETCHED_SUCCESS
+    from app.utils.methods import create_success_response
+    
+    return create_success_response(
+        200,
+        REFERRAL_CODE_GENERATED.format(data=len(codes)),
+        results=codes
+    )
+
+
+@user_router.post("/v1/referral/redeem")
+async def redeem_referral_code(
+    auth_response: current_user_dependency,
+    request: RedeemReferralCodeRequest
+):
+    if auth_response.status == ResponseStatus.FAILURE:
+        return auth_response
+    return await redeem_referral_code_service(auth_response, request)

@@ -18,6 +18,9 @@ ALREADY_EXISTS = "already {data}"
 ACTION_SUCCESS = "{data} successfully"
 OTP_SENT = "otp sent to {email}"
 SAVED_SUCCESS = "{data} saved successfully"
+REFERRAL_CODE_GENERATED = "{data} referral codes generated successfully"
+REFERRAL_CODE_REDEEMED = "referral code redeemed successfully"
+REFERRAL_CODE_INVALID = "invalid or used referral code"
 
 PROMPT_FOR_FETCH_TAGS_HASHTAGS = f"""
 Prompt:

@@ -12,6 +12,7 @@ from app.models.schema import (
     SendOTP,
     VerifyOTP,
     RegenerateTokenRequest,
+    RedeemReferralCodeRequest,
 )
 from app.utils.methods import (
     convert_iso_date_to_humanize,
@@ -21,6 +22,7 @@ from app.utils.methods import (
     is_valid_email,
     serialize_doc,
     token_expired_at,
+    generate_unique_referral_code,
 )
 from app.config.cache.in_memory_cache import (
     cached_mongo_call,
@@ -55,8 +57,12 @@ from app.utils.messages import (
     NO_PREFERENCE,
     NOT_FOUND,
     OTP_VERIFIED,
+    OTP_VERIFIED,
     SELECT_REQUIRED,
     SOME_ERROR,
+    REFERRAL_CODE_GENERATED,
+    REFERRAL_CODE_REDEEMED,
+    REFERRAL_CODE_INVALID,
 )
 
 logger = logging.getLogger("uvicorn")
@@ -381,6 +387,10 @@ async def fetch_user_profile_service(login_user_id: str, user_id: str):
         "is_following": is_following,
     }
 
+    if profile_type == "self":
+        result["referral_codes"] = saved_user.get("referral_codes", [])
+
+
     return create_success_response(
         200,
         FETCHED_SUCCESS.format(data="user"),
@@ -544,7 +554,7 @@ async def user_verify_otp_service(verify_otp: VerifyOTP):
             "user_id": saved_user.get("user_id"),
         }
     )
-    await users_collection.update_one(
+    saved_user = await users_collection.find_one_and_update(
         {"_id": saved_user.get("_id"), "devices.device_id": verify_otp.device_id},
         {
             "$set": {
@@ -556,7 +566,15 @@ async def user_verify_otp_service(verify_otp: VerifyOTP):
                 "devices.$.logged_out_at": None,
             }
         },
+        return_document=True
     )
+    
+    # Generate referral codes if not present
+    if not saved_user.get("referral_codes"):
+        await generate_referral_codes_service(saved_user.get("user_id"), 5)
+        # Re-fetch user to get the codes
+        saved_user = await users_collection.find_one({"_id": saved_user.get("_id")})
+
     return create_success_response(
         200,
         OTP_VERIFIED,
@@ -570,9 +588,105 @@ async def user_verify_otp_service(verify_otp: VerifyOTP):
                 "token_expire_at": token_expired_at(access_token),
                 "username": saved_user.get("username"),
                 "user_id": saved_user.get("user_id"),
+                "referral_codes": saved_user.get("referral_codes", []),
             },
         },
     )
+
+
+async def generate_referral_codes_service(user_id: str, count: int = 1):
+    logger.info(f"Generating {count} referral codes for user {user_id}")
+    new_codes = []
+    for _ in range(count):
+        code = generate_unique_referral_code()
+        # Ensure uniqueness (simple check, conflict is rare with enough length)
+        # Ideally check against DB, but for now relying on randomness
+        new_codes.append({
+            "code": code,
+            "is_used": False,
+            "used_by": None,
+            "used_at": None,
+            "created_at": datetime.now(timezone.utc)
+        })
+    
+    await users_collection.update_one(
+        {"user_id": user_id},
+        {"$push": {"referral_codes": {"$each": new_codes}}}
+    )
+    return new_codes
+
+
+async def redeem_referral_code_service(auth_response, request: RedeemReferralCodeRequest):
+    redeemer_user_id = auth_response.result["user_id"]
+    logger.info(f"User {redeemer_user_id} redeeming code {request.referral_code}")
+    
+    code = request.referral_code.strip()
+    
+    # Find user with this code
+    owner_user = await users_collection.find_one(
+        {"referral_codes": {"$elemMatch": {"code": code, "is_used": False}}}
+    )
+    
+    if not owner_user:
+        return create_exception_response(400, REFERRAL_CODE_INVALID)
+    
+    owner_user_id = owner_user.get("user_id")
+    
+    # Prevent self-referral
+    if owner_user_id == redeemer_user_id:
+         return create_exception_response(400, "You cannot redeem your own referral code")
+
+    # Mark as used
+    await users_collection.update_one(
+        {"user_id": owner_user_id, "referral_codes.code": code},
+        {
+            "$set": {
+                "referral_codes.$.is_used": True,
+                "referral_codes.$.used_by": redeemer_user_id,
+                "referral_codes.$.used_at": datetime.now(timezone.utc)
+            }
+        }
+    )
+
+    # Reward points to both users
+    points = 10
+    now = datetime.now(timezone.utc)
+
+    # Award to owner
+    await users_collection.update_one(
+        {"user_id": owner_user_id},
+        {"$inc": {"total_points": points}}
+    )
+    await points_collection.insert_one({
+        "user_id": owner_user_id,
+        "type": "earned",
+        "icon": "🎁",
+        "points": points,
+        "reason": f"Referral code {code} used by a friend",
+        "created_at": now
+    })
+
+    # Award to redeemer
+    await users_collection.update_one(
+        {"user_id": redeemer_user_id},
+        {"$inc": {"total_points": points}}
+    )
+    await points_collection.insert_one({
+        "user_id": redeemer_user_id,
+        "type": "earned",
+        "icon": "🎁",
+        "points": points,
+        "reason": f"Used referral code {code}",
+        "created_at": now
+    })
+    
+    return create_success_response(
+        200,
+        REFERRAL_CODE_REDEEMED,
+        result={"referral_code": code}
+    )
+
+
 
 
 async def regenerate_token_service(request: RegenerateTokenRequest):

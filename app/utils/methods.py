@@ -120,3 +120,11 @@ def send_otp_email(saved_email_config, email, otp):
     finally:
         if server:
             server.quit()
+
+
+def generate_unique_referral_code(length=8):
+    import random
+    import string
+    chars = string.ascii_uppercase + string.digits
+    return ''.join(random.choice(chars) for _ in range(length))
+
