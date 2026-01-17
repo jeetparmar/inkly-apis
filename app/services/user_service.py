@@ -384,6 +384,7 @@ async def fetch_user_profile_service(login_user_id: str, user_id: str):
         "total_points": saved_user.get("total_points", 0),
         "total_followers": saved_user.get("total_followers", 0),
         "total_following": saved_user.get("total_following", 0),
+        "total_bookmarks": saved_user.get("total_bookmarks", 0),
         "is_following": is_following,
     }
 

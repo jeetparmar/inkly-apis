@@ -14,6 +14,7 @@ from app.services.content_service import (
     fetch_heart_service,
     save_comment_service,
     fetch_comments_service,
+    fetch_bookmarks_service,
 )
 from app.utils.enums.PostFilters import PostDuration, PostSortBy, PostFilter
 from app.models.schema import CommentText, MyResponse, PostRequest
@@ -153,6 +154,17 @@ async def fetch_hearts(auth_response: current_user_dependency, post_id: str, pag
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
     return await fetch_heart_service(auth_response.result["user_id"], post_id, page, limit)
+
+
+@content_router.get("/v1/bookmarks", response_model=MyResponse)
+async def fetch_bookmarks(
+    auth_response: current_user_dependency,
+    page: int = Query(1, gt=0),
+    limit: int = Query(10, gt=0, le=100),
+):
+    if auth_response.status == ResponseStatus.FAILURE:
+        return auth_response
+    return await fetch_bookmarks_service(auth_response.result["user_id"], page, limit)
 
 
 @content_router.get("/v1/comments/{post_id}")

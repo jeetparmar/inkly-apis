@@ -69,6 +69,7 @@ class User(BaseModel):
     total_stories: int = 0
     total_followers: int = 0
     total_following: int = 0
+    total_bookmarks: int = 0
 
 
 class RegenerateTokenRequest(BaseModel):

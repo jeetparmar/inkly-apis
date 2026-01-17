@@ -186,6 +186,19 @@ async def fetch_posts_service(
     raw_posts = await cursor.to_list(length=limit)
 
     # ---------------- Fetch Related Data ----------------
+    response = create_success_response(
+        200,
+        FETCHED_SUCCESS.format(data="posts"),
+        results=await _format_posts_data(login_user_id, saved_user, raw_posts),
+        total=total,
+        page=page,
+        limit=limit,
+    )
+    return response
+
+
+async def _format_posts_data(login_user_id: str, saved_user: dict, raw_posts: list):
+    # ---------------- Fetch Related Data ----------------
     post_ids = [s["_id"] for s in raw_posts]
 
     user_hearts = {
@@ -259,11 +272,58 @@ async def fetch_posts_service(
                 ),
             }
         )
+    return posts
+
+
+async def fetch_bookmarks_service(
+    login_user_id: str,
+    page: int = 1,
+    limit: int = 10,
+):
+    logger.info("content_service.fetch_bookmarks_service")
+
+    # ---------------- Verify User ----------------
+    saved_user, error = await get_verified_user(login_user_id)
+    if error:
+        return error
+
+    page = max(page, 1)
+    limit = max(limit, 1)
+
+    # ---------------- Query Bookmarks ----------------
+    total = await posts_bookmarks_collection.count_documents({"user_id": login_user_id})
+
+    cursor = (
+        posts_bookmarks_collection.find({"user_id": login_user_id})
+        .sort("bookmarked_at", -1)
+        .skip((page - 1) * limit)
+        .limit(limit)
+    )
+
+    bookmarks = await cursor.to_list(length=limit)
+    post_ids = [b["post_id"] for b in bookmarks]
+
+    if not post_ids:
+        return create_success_response(
+            200,
+            FETCHED_SUCCESS.format(data="bookmarks"),
+            results=[],
+            total=total,
+            page=page,
+            limit=limit,
+        )
+
+    # Fetch posts
+    raw_posts = await posts_collection.find({"_id": {"$in": post_ids}}).to_list(None)
+
+    # We need to maintain the order of bookmarks
+    posts_map = {p["_id"]: p for p in raw_posts}
+    ordered_raw_posts = [posts_map[pid] for pid in post_ids if pid in posts_map]
 
     response = create_success_response(
         200,
-        FETCHED_SUCCESS.format(data="posts"),
-        results=posts,
+        FETCHED_SUCCESS.format(data="bookmarks"),
+        results=await _format_posts_data(login_user_id, saved_user, ordered_raw_posts),
         total=total,
         page=page,
         limit=limit,
@@ -615,6 +675,11 @@ async def toggle_bookmark_service(login_user_id: str, post_id: str):
                 {"$inc": {"stats.bookmarks": 1}},
                 return_document=ReturnDocument.AFTER,
             )
+            # Increment user's total_bookmarks
+            await users_collection.update_one(
+                {"user_id": login_user_id},
+                {"$inc": {"total_bookmarks": 1}}
+            )
             action = "added"
         else:
             # Already exists, remove
@@ -635,6 +700,19 @@ async def toggle_bookmark_service(login_user_id: str, post_id: str):
                         }
                     ],
                     return_document=ReturnDocument.AFTER,
+                )
+                # Decrement user's total_bookmarks
+                await users_collection.update_one(
+                    {"user_id": login_user_id},
+                    [
+                        {
+                            "$set": {
+                                "total_bookmarks": {
+                                    "$max": [{"$subtract": ["$total_bookmarks", 1]}, 0]
+                                }
+                            }
+                        }
+                    ]
                 )
                 action = "removed"
             else:
