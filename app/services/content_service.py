@@ -1092,24 +1092,47 @@ async def delete_comment_service(login_user_id: str, comment_id: str):
         # Delete the comment
         await posts_comments_collection.delete_one({"_id": comment_oid})
 
-        # Decrement comments_count in the post
+        # Decrement comments count in the post
         result = await posts_collection.find_one_and_update(
             {"_id": post_oid},
-            {"$inc": {"comments_count": -1}},
+            [
+                {
+                    "$set": {
+                        "stats.comments": {
+                            "$max": [{"$subtract": ["$stats.comments", 1]}, 0]
+                        }
+                    }
+                }
+            ],
             return_document=ReturnDocument.AFTER,
         )
 
-        points_collection.delete_one(
+        # Deduct points from user
+        points = 10
+        await points_collection.delete_one(
             {
                 "user_id": login_user_id,
                 "post_id": post_oid,
                 "source_id": comment_oid,
             }
         )
+        await users_collection.update_one(
+            {"user_id": login_user_id},
+            [
+                {
+                    "$set": {
+                        "total_points": {
+                            "$max": [{"$subtract": ["$total_points", points]}, 0]
+                        }
+                    }
+                }
+            ],
+        )
+
         return create_success_response(
             200,
             ACTION_SUCCESS.format(data="Comment deleted"),
-            total=result.get("comments_count", 0),
+            total=result.get("stats", {}).get("comments", 0),
         )
 
     except Exception as e:
