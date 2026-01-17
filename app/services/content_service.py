@@ -35,6 +35,7 @@ from app.config.database.mongo import (
     user_notifications_collection
 )
 from app.utils.settings import settings
+from app.utils.notification_manager import notification_manager
 
 logger = logging.getLogger("uvicorn")
 
@@ -792,6 +793,21 @@ async def toggle_heart_service(login_user_id: str, post_id: str):
                     "created_at": now,
                 }
                 await user_notifications_collection.insert_one(notification_data)
+                # Push notification via WebSocket
+                await notification_manager.send_personal_notification(
+                    post_owner_id, 
+                    {
+                        "type": "heart",
+                        "message": notification_data["message"],
+                        "actor": {
+                            "user_id": login_user_id,
+                            "name": saved_user.get('name', 'Someone'),
+                            "avatar": saved_user.get('avatar', 'https://i.pravatar.cc/300?img=3'),
+                        },
+                        "post_id": str(post_oid),
+                        "created_at": now.isoformat()
+                    }
+                )
             action = "added"
         else:
             # Already exists, remove heart
@@ -1074,6 +1090,23 @@ async def save_comment_service(login_user_id: str, post_id: str, comment_text: s
                 "created_at": now,
             }
             await user_notifications_collection.insert_one(notification_data)
+            # Push notification via WebSocket
+            await notification_manager.send_personal_notification(
+                post_owner_id,
+                {
+                    "type": "comment",
+                    "message": notification_data["message"],
+                    "actor": {
+                        "user_id": login_user_id,
+                        "name": saved_user.get('name', 'Someone'),
+                        "avatar": saved_user.get('avatar', 'https://i.pravatar.cc/300?img=3'),
+                    },
+                    "post_id": str(post_oid),
+                    "comment_id": str(comment_data["_id"]),
+                    "created_at": now.isoformat()
+                }
+            )
+
         return create_success_response(
             200,
             ACTION_SUCCESS.format(data="Comment added"),

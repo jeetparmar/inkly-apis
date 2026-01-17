@@ -4,7 +4,9 @@ from app.config.database.mongo import (
     users_collection,
     users_connections_collection,
     points_collection,
+    user_notifications_collection,
 )
+from app.utils.notification_manager import notification_manager
 from app.utils.methods import (
     convert_iso_date_to_humanize,
     create_exception_response,
@@ -206,6 +208,33 @@ async def save_follow_service(login_user_id, user_id):
             {"user_id": login_user_id},
             {"$inc": {"total_points": points}},
         )
+        # Add notification
+        now = datetime.now(timezone.utc)
+        notification_data = {
+            "user_id": user["user_id"],
+            "actor_id": login_user_id,
+            "type": "follow",
+            "message": f"{saved_user.get('name', 'Someone')} started following you",
+            "is_read": False,
+            "created_at": now,
+        }
+        await user_notifications_collection.insert_one(notification_data)
+
+        # Push notification via WebSocket
+        await notification_manager.send_personal_notification(
+            user["user_id"],
+            {
+                "type": "follow",
+                "message": notification_data["message"],
+                "actor": {
+                    "user_id": login_user_id,
+                    "name": saved_user.get('name', 'Someone'),
+                    "avatar": saved_user.get('avatar', 'https://i.pravatar.cc/300?img=3'),
+                },
+                "created_at": now.isoformat()
+            }
+        )
+
         saved_user: User = await users_collection.find_one({"user_id": login_user_id})
         return create_success_response(
             200,

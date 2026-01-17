@@ -1,5 +1,5 @@
 from typing import Annotated, Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from app.services.content_service import (
     delete_post_service,
     generate_content_from_llm_service,
@@ -22,7 +22,8 @@ from app.utils.enums.PostFilters import PostDuration, PostSortBy, PostFilter
 from app.models.schema import CommentText, MyResponse, PostRequest
 from app.utils.enums.PostType import PostType
 from app.utils.enums.ResponseStatus import ResponseStatus
-from app.config.auth.dependencies import get_current_user
+from app.config.auth.dependencies import get_current_user, get_current_user_ws
+from app.utils.notification_manager import notification_manager
 
 content_router = APIRouter()
 
@@ -221,6 +222,25 @@ async def mark_notification_as_read(
 ):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
-    return await mark_notification_as_read_service(
-        auth_response.result["user_id"], notification_id
-    )
+
+@content_router.websocket("/ws/notifications/{token}")
+async def websocket_notifications(websocket: WebSocket, token: str):
+    auth_response = get_current_user_ws(token)
+    if auth_response.status == ResponseStatus.FAILURE:
+        await websocket.close(code=4001)  # Unauthorized
+        return
+
+    user_id = auth_response.result["user_id"]
+    await notification_manager.connect(user_id, websocket)
+
+    try:
+        while True:
+            # Keep the connection open and listen for any client messages (though we mainly push)
+            data = await websocket.receive_text()
+            # We can handle client messages here if needed, but for now just log
+            logger.info(f"Received message from user {user_id}: {data}")
+    except WebSocketDisconnect:
+        notification_manager.disconnect(user_id, websocket)
+    except Exception as e:
+        logger.error(f"WebSocket error for user {user_id}: {e}")
+        notification_manager.disconnect(user_id, websocket)
