@@ -223,7 +223,7 @@ async def mark_notification_as_read(
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
 
-@content_router.websocket("/ws/notifications/{token}")
+@content_router.websocket("/v1/ws/notifications/{token}")
 async def websocket_notifications(websocket: WebSocket, token: str):
     auth_response = get_current_user_ws(token)
     if auth_response.status == ResponseStatus.FAILURE:
