@@ -1238,3 +1238,30 @@ async def fetch_user_notifications_service(
     except Exception as e:
         logger.exception("Error in fetch_user_notifications_service")
         return create_exception_response(500, f"An unexpected error occurred: {str(e)}")
+
+
+async def mark_notification_as_read_service(login_user_id: str, notification_id: str):
+    logger.info(f"content_service.mark_notification_as_read_service: {notification_id}")
+    try:
+        # Verify user
+        saved_user, error = await get_verified_user(login_user_id)
+        if error:
+            return error
+
+        try:
+            notif_oid = ObjectId(notification_id)
+        except Exception:
+            return create_exception_response(400, "Invalid notification_id")
+
+        result = await user_notifications_collection.update_one(
+            {"_id": notif_oid, "user_id": login_user_id},
+            {"$set": {"is_read": True}}
+        )
+
+        if result.matched_count == 0:
+            return create_exception_response(404, "Notification not found or unauthorized")
+
+        return create_success_response(200, ACTION_SUCCESS.format(data="Notification marked as read"))
+    except Exception as e:
+        logger.exception("Error in mark_notification_as_read_service")
+        return create_exception_response(500, f"An unexpected error occurred: {str(e)}")
