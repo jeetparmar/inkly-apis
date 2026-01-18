@@ -39,6 +39,16 @@ from app.utils.notification_manager import notification_manager
 
 logger = logging.getLogger("uvicorn")
 
+POST_TYPE_CONFIG = {
+    PostType.story: {"points": 50, "icon": "📚", "field": "total_stories"},
+    PostType.joke: {"points": 40, "icon": "😂", "field": "total_jokes"},
+    PostType.poem: {"points": 40, "icon": "🎭", "field": "total_poems"},
+    PostType.quote: {"points": 40, "icon": "💭", "field": "total_quotes"},
+    PostType.fact: {"points": 40, "icon": "🧠", "field": "total_facts"},
+    PostType.riddle: {"points": 40, "icon": "🧩", "field": "total_riddles"},
+    PostType.article: {"points": 40, "icon": "📰", "field": "total_articles"},
+}
+
 
 async def fetch_related_images_service(login_user_id: str, title: str):
     logger.info("content_service.fetch_related_images")
@@ -424,6 +434,37 @@ async def save_post_service(
 
     now = datetime.now(timezone.utc)
 
+    async def handle_publish_stats(p_id, p_type, is_transition=False):
+        config = POST_TYPE_CONFIG.get(p_type, {"points": 40, "icon": "", "field": ""})
+        points = config["points"]
+        icon = config["icon"]
+        field = config["field"]
+
+        inc_data = {"total_points": points}
+        if field:
+            inc_data[field] = 1
+        if is_transition:
+            inc_data["total_drafts"] = -1
+
+        await users_collection.update_one(
+            {"user_id": login_user_id},
+            {"$inc": inc_data},
+        )
+        await points_collection.insert_one(
+            {
+                "user_id": login_user_id,
+                "post_id": p_id,
+                "type": "earned",
+                "icon": icon,
+                "points": points,
+                "reason": f"Published {p_type.value} from draft"
+                if is_transition
+                else f"Posted {p_type.value}",
+                "created_at": now,
+            }
+        )
+        return points
+
     try:
         if post_id:
             # Validate ObjectId
@@ -431,6 +472,21 @@ async def save_post_service(
                 obj_id = ObjectId(post_id)
             except Exception:
                 return create_exception_response(400, "Invalid post_id")
+
+            # Fetch existing post to check current state
+            existing_post = await posts_collection.find_one(
+                {"_id": obj_id, "author.user_id": login_user_id}
+            )
+
+            if not existing_post:
+                return create_exception_response(
+                    404, "post id not found or unauthorized"
+                )
+
+            # Check if transitioning from draft to published
+            is_transitioning_to_publish = (
+                existing_post.get("is_draft") and not request.is_draft
+            )
 
             # Only update non-stat fields
             update_fields = {
@@ -445,18 +501,18 @@ async def save_post_service(
                 "updated_at": now,
             }
 
-            result = await posts_collection.update_one(
+            await posts_collection.update_one(
                 {"_id": obj_id, "author.user_id": login_user_id},
                 {"$set": update_fields},
                 upsert=False,
             )
 
-            if result.matched_count == 0:
-                return create_exception_response(
-                    404, "post id not found or unauthorized"
-                )
+            if is_transitioning_to_publish:
+                points = await handle_publish_stats(obj_id, type, is_transition=True)
+                message = f"{type.value} published from draft successfully and earned {points} points"
+            else:
+                message = f"{type.value} updated successfully"
 
-            message = f"{type.value} updated successfully"
             status = 200
         else:
             # New post creation
@@ -490,62 +546,14 @@ async def save_post_service(
                 # Increment user draft count
                 await users_collection.update_one(
                     {"user_id": login_user_id},
-                    {
-                        "$inc": {
-                            "total_drafts": 1,
-                        }
-                    },
+                    {"$inc": {"total_drafts": 1}},
                 )
             else:
-                points = 40
-                icon = ""
-                inc_request = {}
-                if type == PostType.story:
-                    points = 50
-                    icon = "📚"
-                    inc_request = {"total_stories": 1}
-                elif type == PostType.joke:
-                    icon = "😂"
-                    inc_request = {"total_jokes": 1}
-                elif type == PostType.poem:
-                    icon = "🎭"
-                    inc_request = {"total_poems": 1}
-                elif type == PostType.quote:
-                    icon = "💭"
-                    inc_request = {"total_quotes": 1}
-                elif type == PostType.fact:
-                    icon = "🧠"
-                    inc_request = {"total_facts": 1}
-                elif type == PostType.riddle:
-                    icon = "🧩"
-                    inc_request = {"total_riddles": 1}
-                elif type == PostType.article:
-                    icon = "📰"
-                    inc_request = {"total_articles": 1}
-            
-                message = f"{type.value} created successfully and earned {points} points"
+                points = await handle_publish_stats(result.inserted_id, type)
+                message = (
+                    f"{type.value} created successfully and earned {points} points"
+                )
                 status = 201
-                # Increment user post count
-                await users_collection.update_one(
-                    {"user_id": login_user_id},
-                    {
-                        "$inc": {
-                            **inc_request,
-                            "total_points": points,
-                        }
-                    },
-                )
-                points_collection.insert_one(
-                    {
-                        "user_id": login_user_id,
-                        "post_id": result.inserted_id if not post_id else obj_id,
-                        "type": "earned",
-                        "icon": icon,
-                        "points": points,
-                        "reason": f"Posted {type.value}",
-                        "created_at": now,
-                    }
-                )
         return create_success_response(status, message, data={"post_id": post_id})
     except Exception as e:
         logger.error(f"Error saving post: {e}", exc_info=True)
@@ -583,18 +591,9 @@ async def delete_post_service(login_user_id: str, post_id: str):
             {"$inc": {"total_drafts": -1}},
         )
     else:
-        POST_TYPE_COUNT_FIELD = {
-            "story": "total_stories",
-            "joke": "total_jokes",
-            "poem": "total_poems",
-            "quote": "total_quotes",
-            "fact": "total_facts",
-            "riddle": "total_riddles",
-            "article": "total_articles",
-        }
-
         post_type = post.get("type", "story")
-        count_field = POST_TYPE_COUNT_FIELD.get(post_type)
+        config = POST_TYPE_CONFIG.get(post_type, {})
+        count_field = config.get("field")
 
         if count_field:
             await users_collection.update_one(
