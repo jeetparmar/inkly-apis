@@ -364,7 +364,7 @@ async def fetch_user_posts_service(
 
     # ---------------- Query Stories ----------------
     query = {"author.user_id": user_id, "is_draft": is_draft}
-    if type:
+    if type and is_draft == False:
         query["type"] = types
 
     if search:
@@ -437,6 +437,8 @@ async def save_post_service(
                 "title": request.title,
                 "image": request.image,
                 "content": request.content,
+                "theme": request.theme,
+                "tags": request.tags,
                 "is_anonymous": request.is_anonymous,
                 "is_18_plus": request.is_18_plus,
                 "is_draft": request.is_draft,
@@ -464,6 +466,8 @@ async def save_post_service(
                 "title": request.title,
                 "image": request.image,
                 "content": request.content,
+                "theme": request.theme,
+                "tags": request.tags,
                 "is_anonymous": request.is_anonymous,
                 "is_18_plus": request.is_18_plus,
                 "is_draft": request.is_draft,
@@ -479,57 +483,69 @@ async def save_post_service(
             }
 
             result = await posts_collection.insert_one(content_data)
-            if type == PostType.story:
-                points = 50
-                icon = "📚"
-                inc_request = {"total_stories": 1}
-            elif type == PostType.joke:
+
+            if request.is_draft:
+                message = f"{type.value} saved as draft"
+                status = 200
+                # Increment user draft count
+                await users_collection.update_one(
+                    {"user_id": login_user_id},
+                    {
+                        "$inc": {
+                            "total_drafts": 1,
+                        }
+                    },
+                )
+            else:
                 points = 40
-                icon = "😂"
-                inc_request = {"total_jokes": 1}
-            elif type == PostType.poem:
-                points = 40
-                icon = "🎭"
-                inc_request = {"total_poems": 1}
-            elif type == PostType.quote:
-                points = 40
-                icon = "💭"
-                inc_request = {"total_quotes": 1}
-            elif type == PostType.fact:
-                points = 40
-                icon = "🧠"
-                inc_request = {"total_facts": 1}
-            elif type == PostType.riddle:
-                points = 40
-                icon = "🧩"
-                inc_request = {"total_riddles": 1}
-            elif type == PostType.article:
-                points = 40
-                icon = "📰"
-                inc_request = {"total_articles": 1}
-            message = f"{type.value} created successfully and earned {points} points"
-            status = 201
-            # Increment user post count
-            await users_collection.update_one(
-                {"user_id": login_user_id},
-                {
-                    "$inc": {
-                        **inc_request,
-                        "total_points": points,
+                icon = ""
+                inc_request = {}
+                if type == PostType.story:
+                    points = 50
+                    icon = "📚"
+                    inc_request = {"total_stories": 1}
+                elif type == PostType.joke:
+                    icon = "😂"
+                    inc_request = {"total_jokes": 1}
+                elif type == PostType.poem:
+                    icon = "🎭"
+                    inc_request = {"total_poems": 1}
+                elif type == PostType.quote:
+                    icon = "💭"
+                    inc_request = {"total_quotes": 1}
+                elif type == PostType.fact:
+                    icon = "🧠"
+                    inc_request = {"total_facts": 1}
+                elif type == PostType.riddle:
+                    icon = "🧩"
+                    inc_request = {"total_riddles": 1}
+                elif type == PostType.article:
+                    icon = "📰"
+                    inc_request = {"total_articles": 1}
+            
+                message = f"{type.value} created successfully and earned {points} points"
+                status = 201
+                # Increment user post count
+                await users_collection.update_one(
+                    {"user_id": login_user_id},
+                    {
+                        "$inc": {
+                            **inc_request,
+                            "total_points": points,
+                        }
+                    },
+                )
+                points_collection.insert_one(
+                    {
+                        "user_id": login_user_id,
+                        "post_id": result.inserted_id if not post_id else obj_id,
+                        "type": "earned",
+                        "icon": icon,
+                        "points": points,
+                        "reason": f"Posted {type.value}",
+                        "created_at": now,
                     }
-                },
-            )
-            points_collection.insert_one(
-                {
-                    "user_id": login_user_id,
-                    "post_id": result.inserted_id if not post_id else obj_id,
-                    "type": "earned",
-                    "icon": icon,
-                    "points": points,
-                    "reason": f"Posted {type.value}",
-                    "created_at": now,
-                }
-            )
+                )
         return create_success_response(status, message, data={"post_id": post_id})
     except Exception as e:
         logger.error(f"Error saving post: {e}", exc_info=True)
@@ -561,51 +577,52 @@ async def delete_post_service(login_user_id: str, post_id: str):
     # Delete the post
     await posts_collection.delete_one({"_id": post_obj_id})
 
-    # Map post types to user count fields
-    POST_TYPE_COUNT_FIELD = {
-        "story": "total_stories",
-        "joke": "total_jokes",
-        "poem": "total_poems",
-        "quote": "total_quotes",
-        "fact": "total_facts",
-        "riddle": "total_riddles",
-        "article": "total_articles",
-    }
-
-    post_type = post.get("type", "story")
-    count_field = POST_TYPE_COUNT_FIELD.get(post_type)
-
-    if count_field:
-        # Decrement only if current count > 0
+    if post.get("is_draft"):
         await users_collection.update_one(
-            {"user_id": saved_user["user_id"], count_field: {"$gt": 0}},
-            {"$inc": {count_field: -1}},
+            {"user_id": login_user_id},
+            {"$inc": {"total_drafts": -1}},
         )
+    else:
+        POST_TYPE_COUNT_FIELD = {
+            "story": "total_stories",
+            "joke": "total_jokes",
+            "poem": "total_poems",
+            "quote": "total_quotes",
+            "fact": "total_facts",
+            "riddle": "total_riddles",
+            "article": "total_articles",
+        }
 
-    points_cursor = points_collection.find(
-        {"post_id": post_obj_id, "user_id": login_user_id}
-    )
-    total_points = 0
-    async for point_record in points_cursor:
-        total_points += point_record.get("points", 0)
-    if total_points > 0:
-        await users_collection.update_one(
-            {"user_id": saved_user["user_id"]},
-            {"$inc": {"total_points": -total_points}},
+        post_type = post.get("type", "story")
+        count_field = POST_TYPE_COUNT_FIELD.get(post_type)
+
+        if count_field:
+            await users_collection.update_one(
+                {"user_id": saved_user["user_id"], count_field: {"$gt": 0}},
+                {"$inc": {count_field: -1}},
+            )
+
+        points_cursor = points_collection.find(
+            {"post_id": post_obj_id, "user_id": login_user_id}
         )
+        total_points = 0
+        async for point_record in points_cursor:
+            total_points += point_record.get("points", 0)
+        if total_points > 0:
+            await users_collection.update_one(
+                {"user_id": saved_user["user_id"]},
+                {"$inc": {"total_points": -total_points}},
+            )
 
-    # Clean up related data
-    delete_tasks = [
-        posts_views_collection.delete_many({"post_id": post_obj_id}),
-        posts_hearts_collection.delete_many({"post_id": post_obj_id}),
-        posts_comments_collection.delete_many({"post_id": post_obj_id}),
-        posts_bookmarks_collection.delete_many({"post_id": post_obj_id}),
-        points_collection.delete_many({"post_id": post_obj_id}),
-    ]
-    await asyncio.gather(*delete_tasks)
-
+        delete_tasks = [
+            posts_views_collection.delete_many({"post_id": post_obj_id}),
+            posts_hearts_collection.delete_many({"post_id": post_obj_id}),
+            posts_comments_collection.delete_many({"post_id": post_obj_id}),
+            posts_bookmarks_collection.delete_many({"post_id": post_obj_id}),
+            points_collection.delete_many({"post_id": post_obj_id}),
+        ]
+        await asyncio.gather(*delete_tasks)
     return create_success_response(200, "Post deleted successfully")
-
 
 async def save_view_count_service(login_user_id: str, post_id: str):
     logger.info("content_service.save_view_count_service")

@@ -377,6 +377,7 @@ async def fetch_user_profile_service(login_user_id: str, user_id: str):
         "email": saved_user.get("email"),
         "gender": saved_user.get("gender"),
         "interests": interest_ids,
+        "total_drafts": saved_user.get("total_drafts", 0),
         "total_stories": saved_user.get("total_stories", 0),
         "total_jokes": saved_user.get("total_jokes", 0),
         "total_poems": saved_user.get("total_poems", 0),

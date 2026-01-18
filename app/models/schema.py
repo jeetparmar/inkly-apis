@@ -34,9 +34,12 @@ class PostRequest(BaseModel):
     title: Optional[str] = None
     image: Optional[str] = None
     content: str = None
-    is_anonymous: bool = False
+    theme: Optional[str] = None
+    tags: Optional[list[str]] = None
     is_draft: bool = False
     is_18_plus: bool = False
+    is_anonymous: bool = False
+    is_for_kids: bool = False
 
 
 class SendOTP(BaseModel):
