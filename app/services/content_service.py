@@ -7,7 +7,7 @@ from bson import ObjectId
 from bson import errors as bson_errors
 import httpx
 from pymongo import ReturnDocument
-from app.models.schema import PostRequest
+from app.models.schema import PostRequest, PostFilterParams
 from app.utils.enums.PostType import PostType
 from app.utils.enums.PostFilters import PostDuration, PostSortBy, PostFilter
 from app.utils.gemini import ask_from_gemini
@@ -124,19 +124,7 @@ async def generate_content_from_llm_service(
 # ---------------- Posts Service ----------------
 async def fetch_posts_service(
     login_user_id: str,
-    types: list[PostType],
-    theme: str = None,
-    tags: list[str] = None,
-    search: str = None,
-    is_18_plus: bool = False,
-    is_anonymous: bool = None,
-    is_for_kids: bool = None,
-    filter: PostFilter = PostFilter.NONE,
-    user_id: str = None,
-    duration: PostDuration = PostDuration.ALL_TIME,
-    sort_by: PostSortBy = PostSortBy.NEWEST,
-    page: int = 1,
-    limit: int = 10,
+    params: PostFilterParams,
 ):
     logger.info("content_service.fetch_posts_service")
 
@@ -146,11 +134,11 @@ async def fetch_posts_service(
         return error
 
     # ---------------- Validation ----------------
-    if theme:
+    if params.theme:
         # If types are provided, only check themes for those types
         applicable_configs = [
             conf for conf in CONTENT_CONFIGS_DATA 
-            if not types or conf["type"] in [t.value for t in types]
+            if not params.types or conf["type"] in [t.value for t in params.types]
         ]
         
         valid_themes = set()
@@ -158,71 +146,73 @@ async def fetch_posts_service(
             for t in conf.get("themes", []):
                 valid_themes.add(t["id"])
         
-        if theme not in valid_themes:
+        if params.theme in valid_themes:
+            pass # Valid
+        else:
             # Check if it exists in ANY config to give better error message
             all_themes = {t["id"] for conf in CONTENT_CONFIGS_DATA for t in conf.get("themes", [])}
-            if theme in all_themes:
-                return create_exception_response(400, f"Theme '{theme}' is not applicable for the selected post types.")
-            return create_exception_response(400, f"Invalid theme: '{theme}'.")
+            if params.theme in all_themes:
+                return create_exception_response(400, f"Theme '{params.theme}' is not applicable for the selected post types.")
+            return create_exception_response(400, f"Invalid theme: '{params.theme}'.")
 
-    page = max(page, 1)
-    limit = max(limit, 1)
+    page = max(params.page, 1)
+    limit = max(params.limit, 1)
     # ---------------- Query Stories ----------------
-    query = {"is_draft": False, "is_18_plus": is_18_plus}
+    query = {"is_draft": False, "is_18_plus": params.is_18_plus}
     
-    if is_anonymous is not None:
-        query["is_anonymous"] = is_anonymous
+    if params.is_anonymous is not None:
+        query["is_anonymous"] = params.is_anonymous
         
-    if is_for_kids is not None:
-        query["is_for_kids"] = is_for_kids
-    if types:
-        query["type"] = {"$in": types}
+    if params.is_for_kids is not None:
+        query["is_for_kids"] = params.is_for_kids
+    if params.types:
+        query["type"] = {"$in": params.types}
     
-    if theme:
-        query["theme"] = theme
+    if params.theme:
+        query["theme"] = params.theme
         
-    if tags:
-        query["tags"] = {"$all": tags}
+    if params.tags:
+        query["tags"] = {"$all": params.tags}
     
-    if search:
+    if params.search:
         query["$or"] = [
-            {"title": {"$regex": search, "$options": "i"}},
-            {"content": {"$regex": search, "$options": "i"}},
+            {"title": {"$regex": params.search, "$options": "i"}},
+            {"content": {"$regex": params.search, "$options": "i"}},
         ]
 
     # ---------------- Filter by Duration ----------------
-    if duration and duration != PostDuration.ALL_TIME:
+    if params.duration and params.duration != PostDuration.ALL_TIME:
         now = datetime.now(timezone.utc)
-        if duration == PostDuration.LAST_24H:
+        if params.duration == PostDuration.LAST_24H:
             query["created_at"] = {"$gte": now - timedelta(days=1)}
-        elif duration == PostDuration.LAST_7D:
+        elif params.duration == PostDuration.LAST_7D:
             query["created_at"] = {"$gte": now - timedelta(days=7)}
-        elif duration == PostDuration.LAST_30D:
+        elif params.duration == PostDuration.LAST_30D:
             query["created_at"] = {"$gte": now - timedelta(days=30)}
 
     # ---------------- Filter by Source ----------------
-    if filter == PostFilter.FOLLOWING:
+    if params.filter == PostFilter.FOLLOWING:
         followings = await users_connections_collection.find(
             {"follower_id": login_user_id}
         ).to_list(None)
         following_ids = [f["following_id"] for f in followings]
         query["author.user_id"] = {"$in": following_ids}
-    elif filter == PostFilter.FOLLOWERS:
+    elif params.filter == PostFilter.FOLLOWERS:
         followers = await users_connections_collection.find(
             {"following_id": login_user_id}
         ).to_list(None)
         follower_ids = [f["follower_id"] for f in followers]
         query["author.user_id"] = {"$in": follower_ids}
-    elif user_id:
-        query["author.user_id"] = user_id
+    elif params.user_id:
+        query["author.user_id"] = params.user_id
 
     # ---------------- Sorting ----------------
     sort_field = "created_at"
-    if sort_by == PostSortBy.MOST_VIEWED:
+    if params.sort_by == PostSortBy.MOST_VIEWED:
         sort_field = "stats.views"
-    elif sort_by == PostSortBy.MOST_HEARTED:
+    elif params.sort_by == PostSortBy.MOST_HEARTED:
         sort_field = "stats.hearts"
-    elif sort_by == PostSortBy.MOST_COMMENTED:
+    elif params.sort_by == PostSortBy.MOST_COMMENTED:
         sort_field = "stats.comments"
 
     total = await posts_collection.count_documents(query)

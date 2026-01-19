@@ -444,26 +444,28 @@ async def user_send_otp_service(send_otp: SendOTP):
     if saved_device_user is None:
         return create_exception_response(400, INVALID_DATA.format(data="device id"))
 
-    saved_user = await users_collection.find_one(
-        {"devices.device_id": send_otp.device_id, "email": email}
-    )
-    if saved_user is None:
-        # may be same email is trying to login with different device
-        saved_user = await users_collection.find_one({"email": email})
-        if saved_user is not None:
-            await users_collection.update_one(
-                {"_id": saved_user.get("_id")},
-                {"$addToSet": {"devices": {"device_id": send_otp.device_id}}},
-            )
+    # Optimize: Query by email first to cover both "same device" and "new device" login cases
+    saved_user = await users_collection.find_one({"email": email})
 
-        # means first time otp sending
-        if saved_user is None:
-            saved_user = await users_collection.find_one(
-                {
-                    "devices.device_id": send_otp.device_id,
-                    "email": {"$regex": r"^vurse_", "$options": "i"},
-                }
+    if saved_user:
+        # Check if the device is already associated with this user
+        device_exists = any(d.get("device_id") == send_otp.device_id for d in saved_user.get("devices", []))
+        
+        if not device_exists:
+            # Add new device to the existing user
+            await users_collection.update_one(
+                {"_id": saved_user["_id"]},
+                {"$addToSet": {"devices": {"device_id": send_otp.device_id}}}
             )
+    else:
+        # User not found by email. Check if there's a placeholder user for this device (e.g. "vurse_...")
+        # This handles the case where a temporary user claims an account
+        saved_user = await users_collection.find_one(
+            {
+                "devices.device_id": send_otp.device_id,
+                "email": {"$regex": r"^vurse_", "$options": "i"},
+            }
+        )
 
     otp = random.randint(1000, 9999)
 
@@ -472,6 +474,9 @@ async def user_send_otp_service(send_otp: SendOTP):
         device_user_id = saved_device_user.get("user_id")
         if user_id == device_user_id:
             user_id = str(uuid.uuid4())
+        
+        # Update the specific device's OTP using the positional operator $
+        # We query by _id and device_id to ensure we match the correct array element
         await users_collection.update_one(
             {"_id": saved_user.get("_id"), "devices.device_id": send_otp.device_id},
             {
@@ -485,6 +490,7 @@ async def user_send_otp_service(send_otp: SendOTP):
             },
         )
     else:
+        # Create new user
         await users_collection.insert_one(
             {
                 "email": email,
@@ -502,7 +508,8 @@ async def user_send_otp_service(send_otp: SendOTP):
             }
         )
 
-    saved_email_config = await email_config_collection.find_one({})
+    # Use cache for email configuration to avoid repeated DB calls
+    saved_email_config = await cached_mongo_call(email_config_collection, "find_one", {})
     if not saved_email_config:
         saved_email_config = {
             "mail_smtp_host": MAIL_SMTP_HOST,
@@ -512,6 +519,7 @@ async def user_send_otp_service(send_otp: SendOTP):
             "use_tls": True,
             "otp_email_template": OTP_EMAIL_TEMPLATE,
         }
+    
     await enqueue_otp_task({"email": email, "otp": otp, "config": saved_email_config})
     logger.info(f"✅ OTP task enqueued for {email}")
     return create_success_response(200, f"OTP is being sent to {email}")

@@ -26,6 +26,14 @@ async def create_user_id_index():
     await users_collection.create_index([("user_id", 1)], unique=True)
 
 
+async def create_user_email_index():
+    await users_collection.create_index([("email", 1)])
+
+
+async def create_user_device_id_index():
+    await users_collection.create_index([("devices.device_id", 1)])
+
+
 async def create_post_view_index():
     await posts_views_collection.create_index(
         [("user_id", 1), ("post_id", 1)], unique=True

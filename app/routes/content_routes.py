@@ -20,7 +20,7 @@ from app.services.content_service import (
     fetch_content_config_service,
 )
 from app.utils.enums.PostFilters import PostDuration, PostSortBy, PostFilter
-from app.models.schema import CommentText, MyResponse, PostRequest
+from app.models.schema import CommentText, MyResponse, PostRequest, PostFilterParams
 from app.utils.enums.PostType import PostType
 from app.utils.enums.ResponseStatus import ResponseStatus
 from app.config.auth.dependencies import get_current_user, get_current_user_ws
@@ -66,37 +66,13 @@ async def generate_content_from_llm(
 @content_router.get("/v1/posts", response_model=MyResponse)
 async def fetch_posts(
     auth_response: current_user_dependency,
-    types: Optional[list[PostType]] = Query(None),
-    theme: Optional[str] = None,
-    tags: Optional[list[str]] = Query(None),
-    search: Optional[str] = None,
-    is_18_plus: Optional[bool] = Query(False),
-    is_anonymous: Optional[bool] = Query(None),
-    is_for_kids: Optional[bool] = Query(None),
-    filter: Optional[PostFilter] = PostFilter.NONE,
-    user_id: Optional[str] = None,
-    duration: Optional[PostDuration] = PostDuration.ALL_TIME,
-    sort_by: Optional[PostSortBy] = PostSortBy.NEWEST,
-    page: int = Query(1, gt=0),
-    limit: int = Query(10, gt=0, le=100),
+    params: PostFilterParams = Depends(),
 ):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
     return await fetch_posts_service(
         auth_response.result["user_id"],
-        types,
-        theme,
-        tags,
-        search,
-        is_18_plus,
-        is_anonymous,
-        is_for_kids,
-        filter,
-        user_id,
-        duration,
-        sort_by,
-        page,
-        limit,
+        params,
     )
 
 

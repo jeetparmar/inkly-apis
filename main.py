@@ -19,6 +19,8 @@ from app.config.database.mongo import (
     create_post_heart_index,
     create_post_view_index,
     create_user_id_index,
+    create_user_email_index,
+    create_user_device_id_index,
     interests_collection,
     content_configs_collection, 
 )
@@ -77,6 +79,8 @@ async def startup_event():
     index_tasks = [
         ("Device ID", create_device_id_index),
         ("User ID", create_user_id_index),
+        ("User Email", create_user_email_index),
+        ("User Device ID", create_user_device_id_index),
         ("Post View", create_post_view_index),
         ("Post Heart", create_post_heart_index),
         ("Post Bookmark", create_post_bookmark_index),
