@@ -128,6 +128,9 @@ async def fetch_posts_service(
     theme: str = None,
     tags: list[str] = None,
     search: str = None,
+    is_18_plus: bool = False,
+    is_anonymous: bool = None,
+    is_for_kids: bool = None,
     filter: PostFilter = PostFilter.NONE,
     user_id: str = None,
     duration: PostDuration = PostDuration.ALL_TIME,
@@ -165,7 +168,13 @@ async def fetch_posts_service(
     page = max(page, 1)
     limit = max(limit, 1)
     # ---------------- Query Stories ----------------
-    query = {"is_draft": False}
+    query = {"is_draft": False, "is_18_plus": is_18_plus}
+    
+    if is_anonymous is not None:
+        query["is_anonymous"] = is_anonymous
+        
+    if is_for_kids is not None:
+        query["is_for_kids"] = is_for_kids
     if types:
         query["type"] = {"$in": types}
     
@@ -278,17 +287,25 @@ async def _format_posts_data(login_user_id: str, saved_user: dict, raw_posts: li
     for post in raw_posts:
         post_id = post["_id"]
         post_user_id = post.get("author", {}).get("user_id", "")
-        if post_user_id != saved_user.get("user_id", ""):
-            user_id = post_user_id
-            post_author = await users_collection.find_one({"user_id": user_id})
-            name = post_author.get("name", "Unknown")
-            username = post_author.get("username", "unknown")
-            avatar = post_author.get("avatar", "https://i.pravatar.cc/300?img=3")
+        if post.get("is_anonymous"):
+            user_id = ""
+            name = "Anonymous"
+            username = "anonymous"
+            avatar = "https://cdn-icons-png.flaticon.com/512/149/149071.png"
+            is_following = False
         else:
-            user_id = saved_user.get("user_id", "")
-            name = saved_user.get("name", "Unknown")
-            username = saved_user.get("username", "unknown")
-            avatar = saved_user.get("avatar", "https://i.pravatar.cc/300?img=3")
+            if post_user_id != saved_user.get("user_id", ""):
+                user_id = post_user_id
+                post_author = await users_collection.find_one({"user_id": user_id})
+                name = post_author.get("name", "Unknown")
+                username = post_author.get("username", "unknown")
+                avatar = post_author.get("avatar", "https://i.pravatar.cc/300?img=3")
+            else:
+                user_id = saved_user.get("user_id", "")
+                name = saved_user.get("name", "Unknown")
+                username = saved_user.get("username", "unknown")
+                avatar = saved_user.get("avatar", "https://i.pravatar.cc/300?img=3")
+            is_following = user_followings.get(post_user_id, False)
 
         posts.append(
             {
@@ -302,12 +319,15 @@ async def _format_posts_data(login_user_id: str, saved_user: dict, raw_posts: li
                     "name": name,
                     "username": username,
                     "avatar": avatar,
-                    "is_following": user_followings.get(post_user_id, False),
+                    "is_following": is_following,
                     "is_verified": False,
                 },
                 "is_hearted": user_hearts.get(post_id, False),
                 "is_commented": user_comments.get(post_id, False),
                 "is_bookmarked": user_bookmarks.get(post_id, False),
+                "is_18_plus": post.get("is_18_plus", False),
+                "is_anonymous": post.get("is_anonymous", False),
+                "is_for_kids": post.get("is_for_kids", False),
                 "stats": post.get("stats", {}),
                 "created_at_readable": convert_iso_date_to_humanize(
                     post.get("created_at")
@@ -425,16 +445,28 @@ async def fetch_user_posts_service(
     async for post in cursor:
         post["id"] = str(post.pop("_id"))
 
-        author_id = post["author"]["user_id"]
-        author_user = await users_collection.find_one({"user_id": author_id}) or {}
-        post["author"].update(
-            {
-                "name": author_user.get("username", "Unknown"),
-                "avatar": author_user.get("avatar", "https://i.pravatar.cc/300?img=3"),
-                "is_verified": author_user.get("is_verified", False),
-                "is_following": False,
-            }
-        )
+        if post.get("is_anonymous"):
+            post["author"].update(
+                {
+                    "user_id": "",
+                    "name": "Anonymous",
+                    "username": "anonymous",
+                    "avatar": "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+                    "is_verified": False,
+                    "is_following": False,
+                }
+            )
+        else:
+            author_id = post["author"]["user_id"]
+            author_user = await users_collection.find_one({"user_id": author_id}) or {}
+            post["author"].update(
+                {
+                    "name": author_user.get("username", "Unknown"),
+                    "avatar": author_user.get("avatar", "https://i.pravatar.cc/300?img=3"),
+                    "is_verified": author_user.get("is_verified", False),
+                    "is_following": False,
+                }
+            )
         posts.append(post)
 
     # ---------------- Build Response ----------------
@@ -527,6 +559,7 @@ async def save_post_service(
                 "tags": request.tags,
                 "is_anonymous": request.is_anonymous,
                 "is_18_plus": request.is_18_plus,
+                "is_for_kids": request.is_for_kids,
                 "is_draft": request.is_draft,
                 "updated_at": now,
             }
@@ -556,6 +589,7 @@ async def save_post_service(
                 "tags": request.tags,
                 "is_anonymous": request.is_anonymous,
                 "is_18_plus": request.is_18_plus,
+                "is_for_kids": request.is_for_kids,
                 "is_draft": request.is_draft,
                 "stats": {
                     "bookmarks": 0,
