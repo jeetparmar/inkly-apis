@@ -11,7 +11,7 @@ INTERESTS_DATA = [
     {"title": "Dark Humor", "icon": "moon"},
     {"title": "Sarcastic Jokes", "icon": "invert-mode"},
     
-    # Poems
+    # Poetry
     {"title": "Classic Poetry", "icon": "feather"},
     {"title": "Modern Verse", "icon": "brush"},
     {"title": "Haikus", "icon": "leaf"},

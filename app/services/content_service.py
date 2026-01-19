@@ -42,7 +42,7 @@ logger = logging.getLogger("uvicorn")
 POST_TYPE_CONFIG = {
     PostType.story: {"points": 50, "icon": "📚", "field": "total_stories"},
     PostType.joke: {"points": 40, "icon": "😂", "field": "total_jokes"},
-    PostType.poem: {"points": 40, "icon": "🎭", "field": "total_poems"},
+    PostType.poetry: {"points": 40, "icon": "🎭", "field": "total_poetry"},
     PostType.quote: {"points": 40, "icon": "💭", "field": "total_quotes"},
     PostType.fact: {"points": 40, "icon": "🧠", "field": "total_facts"},
     PostType.riddle: {"points": 40, "icon": "🧩", "field": "total_riddles"},
@@ -511,7 +511,7 @@ async def save_post_service(
                 points = await handle_publish_stats(obj_id, type, is_transition=True)
                 message = f"{type.value} published from draft successfully and earned {points} points"
             else:
-                message = f"{type.value} updated successfully"
+                message = f"{type.value.capitalize()} updated successfully"
 
             status = 200
         else:
@@ -541,7 +541,7 @@ async def save_post_service(
             result = await posts_collection.insert_one(content_data)
 
             if request.is_draft:
-                message = f"{type.value} saved as draft"
+                message = f"{type.value.capitalize()} saved as draft"
                 status = 200
                 # Increment user draft count
                 await users_collection.update_one(
@@ -551,7 +551,7 @@ async def save_post_service(
             else:
                 points = await handle_publish_stats(result.inserted_id, type)
                 message = (
-                    f"{type.value} created successfully and earned {points} points"
+                    f"{type.value.capitalize()} created successfully and earned {points} points"
                 )
                 status = 201
         return create_success_response(status, message, data={"post_id": post_id})

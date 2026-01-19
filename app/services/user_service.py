@@ -380,7 +380,7 @@ async def fetch_user_profile_service(login_user_id: str, user_id: str):
         "total_drafts": saved_user.get("total_drafts", 0),
         "total_stories": saved_user.get("total_stories", 0),
         "total_jokes": saved_user.get("total_jokes", 0),
-        "total_poems": saved_user.get("total_poems", 0),
+        "total_poetry": saved_user.get("total_poetry", 0),
         "total_quotes": saved_user.get("total_quotes", 0),
         "total_points": saved_user.get("total_points", 0),
         "total_followers": saved_user.get("total_followers", 0),

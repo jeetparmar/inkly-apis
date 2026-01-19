@@ -4,7 +4,7 @@ from enum import Enum
 class PostType(str, Enum):
     story = "story"
     joke = "joke"
-    poem = "poem"
+    poetry = "poetry"
     quote = "quote"
     fact = "fact"
     riddle = "riddle"
