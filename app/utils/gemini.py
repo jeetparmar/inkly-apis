@@ -13,17 +13,25 @@ def ask_from_gemini(
     content_theme="fantasy",
 ) -> dict:
     content_prompt = f"""
-    Write a {content_theme} {content_type} about {content_about}.
-    The story should be approximately {content_size} words and written in {content_language}.
+    You are a creative writer.
+    
+    Task: Write a {content_theme} {content_type} about {content_about}.
+    Language: {content_language}.
 
     Requirements:
-    - Include a creative and relevant title.
-    - Maintain a fantasy theme throughout the story.
-    - The response MUST be valid JSON.
-    - Use exactly two keys in the JSON:
-    - "title": the story title
-    - "content": the full story text
-    - Do NOT include any explanation, markdown, or text outside the JSON object.
+    1. The content MUST be valid JSON with exactly two keys: "title" and "content".
+    2. "title": A creative title.
+    3. "content": The story text.
+    4. Theme: {content_theme}.
+    5. STYLE: Use simple, easy-to-understand language suitable for a general audience. Avoid complex vocabulary.
+    
+    LENGTH CONSTRAINT:
+    - Target word count: {content_size} words.
+    - MAXIMUM permitted words: {int(content_size) + 20}.
+    - STOP writing immediately if you are approaching this limit.
+    - Shorter is better than longer.
+    
+    Output JSON ONLY. No markdown formatting.
     """
     # 3. Configure Gemini API key
     genai.configure(api_key=ai_key)
