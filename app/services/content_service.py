@@ -11,7 +11,7 @@ from app.models.schema import PostRequest, PostFilterParams
 from app.utils.enums.PostType import PostType
 from app.utils.enums.PostFilters import PostDuration, PostSortBy, PostFilter
 from app.utils.gemini import ask_from_gemini
-from app.utils.chatgpt import ask_from_chatgpt
+from app.utils.openai import ask_from_openai
 from app.utils.methods import (
     convert_iso_date_to_humanize,
     create_success_response,
@@ -104,8 +104,8 @@ async def generate_content_from_llm_service(
         return error
     
     # Route to appropriate AI model
-    if model.lower() == "chatgpt":
-        output = ask_from_chatgpt(ai_key, type, prompt, size, language, theme)
+    if model.lower() == "openai":
+        output = ask_from_openai(ai_key, type, prompt, size, language, theme)
     else:  # Default to Gemini
         output = ask_from_gemini(ai_key, type, prompt, size, language, theme)
     

@@ -4,7 +4,7 @@ from openai import OpenAI
 from app.utils.settings import settings
 
 
-def ask_from_chatgpt(
+def ask_from_openai(
     ai_key: str,
     content_type="story",
     content_about="a little boy",
