@@ -32,22 +32,23 @@ from app.config.database.mongo import (
     posts_comments_collection,
     posts_bookmarks_collection,
     users_connections_collection,
-    user_notifications_collection
+    user_notifications_collection,
+    content_configs_collection,
 )
 from app.utils.settings import settings
 from app.utils.notification_manager import notification_manager
+# Removal of CONTENT_CONFIG import
 
 logger = logging.getLogger("uvicorn")
 
-POST_TYPE_CONFIG = {
-    PostType.story: {"points": 50, "icon": "📚", "field": "total_stories"},
-    PostType.joke: {"points": 40, "icon": "😂", "field": "total_jokes"},
-    PostType.poetry: {"points": 40, "icon": "🎭", "field": "total_poetry"},
-    PostType.quote: {"points": 40, "icon": "💭", "field": "total_quotes"},
-    PostType.fact: {"points": 40, "icon": "🧠", "field": "total_facts"},
-    PostType.riddle: {"points": 40, "icon": "🧩", "field": "total_riddles"},
-    PostType.article: {"points": 40, "icon": "📰", "field": "total_articles"},
-}
+
+async def get_content_config(post_type: PostType):
+    """Utility to fetch config for a specific post type"""
+    config = await content_configs_collection.find_one({"type": post_type.value})
+    if not config:
+        # Fallback to some defaults if not found, though seeding should prevent this
+        return {"points": 40, "icon": "", "stats_field": ""}
+    return config
 
 
 async def fetch_related_images_service(login_user_id: str, title: str):
@@ -435,10 +436,10 @@ async def save_post_service(
     now = datetime.now(timezone.utc)
 
     async def handle_publish_stats(p_id, p_type, is_transition=False):
-        config = POST_TYPE_CONFIG.get(p_type, {"points": 40, "icon": "", "field": ""})
-        points = config["points"]
-        icon = config["icon"]
-        field = config["field"]
+        config = await get_content_config(p_type)
+        points = config.get("points", 40)
+        icon = config.get("icon", "")
+        field = config.get("stats_field", "")
 
         inc_data = {"total_points": points}
         if field:
@@ -591,9 +592,19 @@ async def delete_post_service(login_user_id: str, post_id: str):
             {"$inc": {"total_drafts": -1}},
         )
     else:
-        post_type = post.get("type", "story")
-        config = POST_TYPE_CONFIG.get(post_type, {})
-        count_field = config.get("field")
+        post_type_val = post.get("type")
+        # Find PostType enum member from value
+        post_type = None
+        for pt in PostType:
+            if pt.value == post_type_val:
+                post_type = pt
+                break
+        
+        if not post_type:
+            post_type = PostType.story # Default
+
+        config = await get_content_config(post_type)
+        count_field = config.get("stats_field")
 
         if count_field:
             await users_collection.update_one(
@@ -1314,3 +1325,59 @@ async def mark_notification_as_read_service(login_user_id: str, notification_id:
     except Exception as e:
         logger.exception("Error in mark_notification_as_read_service")
         return create_exception_response(500, f"An unexpected error occurred: {str(e)}")
+
+
+async def fetch_content_config_service(login_user_id: str):
+    logger.info("content_service.fetch_content_config_service")
+
+    # Verify user
+    saved_user, error = await get_verified_user(login_user_id)
+    if error:
+        return error
+
+    # Fetch all configs from DB
+    configs_cursor = content_configs_collection.find({})
+    configs = await configs_cursor.to_list(length=None)
+
+    # Reconstruct the expected response format
+    # {
+    #     "post_types": { type: {emoji, label} },
+    #     "size_config": { type: [sizes] },
+    #     "themes": { type: [themes] },
+    #     "placeholders": { type: string },
+    #     ...
+    # }
+    
+    post_types = {}
+    size_config = {}
+    themes = {}
+    placeholders = {}
+    prompt_placeholders = {}
+    labels = {}
+    buttons = {}
+
+    for cfg in configs:
+        ctype = cfg["type"]
+        post_types[ctype] = {"emoji": cfg["emoji"], "label": cfg["label"]}
+        size_config[ctype] = cfg["sizes"]
+        themes[ctype] = cfg["themes"]
+        placeholders[ctype] = cfg["placeholder"]
+        prompt_placeholders[ctype] = cfg["prompt_placeholder"]
+        labels[ctype] = cfg["field_label"]
+        buttons[ctype] = cfg["button_text"]
+
+    content_config = {
+        "post_types": post_types,
+        "size_config": size_config,
+        "themes": themes,
+        "placeholders": placeholders,
+        "prompt_placeholders": prompt_placeholders,
+        "labels": labels,
+        "buttons": buttons,
+    }
+
+    return create_success_response(
+        200,
+        FETCHED_SUCCESS.format(data="content configuration"),
+        result=content_config,
+    )

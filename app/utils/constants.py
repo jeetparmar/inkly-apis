@@ -36,6 +36,376 @@ INTERESTS_DATA = [
     {"title": "Health Articles", "icon": "medkit"},
     {"title": "Business Articles", "icon": "briefcase"},
 ]
+CONTENT_CONFIGS_DATA = [
+    {
+        "type": "story",
+        "emoji": "📚",
+        "label": "Story",
+        "sizes": [
+            {
+                "id": 300,
+                "label": "Short (≈300 words)"
+            },
+            {
+                "id": 600,
+                "label": "Medium (≈600 words)"
+            },
+            {
+                "id": 1000,
+                "label": "Long (≈1000 words)"
+            }
+        ],
+        "themes": [
+            {
+                "id": "adventure",
+                "label": "🗺️ Adventure"
+            },
+            {
+                "id": "mystery",
+                "label": "🔍 Mystery"
+            },
+            {
+                "id": "romance",
+                "label": "💕 Romance"
+            },
+            {
+                "id": "fantasy",
+                "label": "🧙 Fantasy"
+            },
+            {
+                "id": "sci-fi",
+                "label": "🚀 Sci-Fi"
+            },
+            {
+                "id": "horror",
+                "label": "👻 Horror"
+            },
+            {
+                "id": "drama",
+                "label": "🎭 Drama"
+            }
+        ],
+        "placeholder": "Write your captivating story here...",
+        "prompt_placeholder": "e.g., \"magical forest adventure\", \"time traveling detective\"...",
+        "field_label": "Your Story",
+        "button_text": "Publish Story",
+        "points": 50,
+        "icon": "📚",
+        "stats_field": "total_stories"
+    },
+    {
+        "type": "joke",
+        "emoji": "😂",
+        "label": "Joke",
+        "sizes": [
+            {
+                "id": 50,
+                "label": "Short (≈50 words)"
+            },
+            {
+                "id": 80,
+                "label": "Medium (≈80 words)"
+            },
+            {
+                "id": 100,
+                "label": "Long (≈100 words)"
+            }
+        ],
+        "themes": [
+            {
+                "id": "puns",
+                "label": "🎯 Puns"
+            },
+            {
+                "id": "one-liner",
+                "label": "⚡ One-Liner"
+            },
+            {
+                "id": "observational",
+                "label": "👀 Observational"
+            },
+            {
+                "id": "dark-humor",
+                "label": "🌑 Dark Humor"
+            },
+            {
+                "id": "wordplay",
+                "label": "📝 Wordplay"
+            },
+            {
+                "id": "slapstick",
+                "label": "🤡 Slapstick"
+            }
+        ],
+        "placeholder": "Share your funniest joke...",
+        "prompt_placeholder": "e.g., \"programmers\", \"coffee addiction\", \"cats vs dogs\"...",
+        "field_label": "Your Joke",
+        "button_text": "Share Joke",
+        "points": 40,
+        "icon": "😂",
+        "stats_field": "total_jokes"
+    },
+    {
+        "type": "poetry",
+        "emoji": "🎭",
+        "label": "Poetry",
+        "sizes": [
+            {
+                "id": 50,
+                "label": "Short (≈50 words)"
+            },
+            {
+                "id": 100,
+                "label": "Medium (≈100 words)"
+            },
+            {
+                "id": 150,
+                "label": "Long (≈150 words)"
+            }
+        ],
+        "themes": [
+            {
+                "id": "romantic",
+                "label": "💖 Romantic"
+            },
+            {
+                "id": "nature",
+                "label": "🌿 Nature"
+            },
+            {
+                "id": "melancholic",
+                "label": "🌧️ Melancholic"
+            },
+            {
+                "id": "inspirational",
+                "label": "✨ Inspirational"
+            },
+            {
+                "id": "haiku",
+                "label": "🎋 Haiku"
+            },
+            {
+                "id": "free-verse",
+                "label": "🎨 Free Verse"
+            }
+        ],
+        "placeholder": "Express your poetry and verses...",
+        "prompt_placeholder": "e.g., \"nature\", \"love\", \"dreams\", \"seasons\"...",
+        "field_label": "Your Poetry",
+        "button_text": "Share Poetry",
+        "points": 40,
+        "icon": "🎭",
+        "stats_field": "total_poetry"
+    },
+    {
+        "type": "quote",
+        "emoji": "💭",
+        "label": "Quote",
+        "sizes": [
+            {
+                "id": 20,
+                "label": "Short (≈20 words)"
+            },
+            {
+                "id": 30,
+                "label": "Medium (≈30 words)"
+            },
+            {
+                "id": 50,
+                "label": "Long (≈50 words)"
+            }
+        ],
+        "themes": [
+            {
+                "id": "motivational",
+                "label": "💪 Motivational"
+            },
+            {
+                "id": "inspirational",
+                "label": "✨ Inspirational"
+            },
+            {
+                "id": "philosophical",
+                "label": "🤔 Philosophical"
+            },
+            {
+                "id": "life-lessons",
+                "label": "📖 Life Lessons"
+            },
+            {
+                "id": "success",
+                "label": "🏆 Success"
+            },
+            {
+                "id": "wisdom",
+                "label": "🦉 Wisdom"
+            }
+        ],
+        "placeholder": "Share an inspiring quote...",
+        "prompt_placeholder": "e.g., \"success\", \"friendship\", \"courage\", \"life\"...",
+        "field_label": "Your Quote",
+        "button_text": "Share Quote",
+        "points": 40,
+        "icon": "💭",
+        "stats_field": "total_quotes"
+    },
+    {
+        "type": "fact",
+        "emoji": "🧠",
+        "label": "Fact",
+        "sizes": [
+            {
+                "id": 30,
+                "label": "Short (≈30 words)"
+            },
+            {
+                "id": 60,
+                "label": "Medium (≈60 words)"
+            },
+            {
+                "id": 90,
+                "label": "Long (≈90 words)"
+            }
+        ],
+        "themes": [
+            {
+                "id": "science",
+                "label": "🔬 Science"
+            },
+            {
+                "id": "history",
+                "label": "📜 History"
+            },
+            {
+                "id": "nature",
+                "label": "🌍 Nature"
+            },
+            {
+                "id": "technology",
+                "label": "💻 Technology"
+            },
+            {
+                "id": "space",
+                "label": "🌌 Space"
+            },
+            {
+                "id": "animals",
+                "label": "🦁 Animals"
+            }
+        ],
+        "placeholder": "Share an interesting fact...",
+        "prompt_placeholder": "e.g., \"space\", \"animals\", \"history\", \"science\"...",
+        "field_label": "Your Fact",
+        "button_text": "Share Fact",
+        "points": 40,
+        "icon": "🧠",
+        "stats_field": "total_facts"
+    },
+    {
+        "type": "riddle",
+        "emoji": "🧩",
+        "label": "Riddle",
+        "sizes": [
+            {
+                "id": 30,
+                "label": "Short (≈30 words)"
+            },
+            {
+                "id": 60,
+                "label": "Medium (≈60 words)"
+            },
+            {
+                "id": 90,
+                "label": "Long (≈90 words)"
+            }
+        ],
+        "themes": [
+            {
+                "id": "logic",
+                "label": "🧩 Logic"
+            },
+            {
+                "id": "wordplay",
+                "label": "📝 Wordplay"
+            },
+            {
+                "id": "math",
+                "label": "🔢 Math"
+            },
+            {
+                "id": "lateral-thinking",
+                "label": "💡 Lateral Thinking"
+            },
+            {
+                "id": "mystery",
+                "label": "🔍 Mystery"
+            },
+            {
+                "id": "tricky",
+                "label": "😏 Tricky"
+            }
+        ],
+        "placeholder": "Create a challenging riddle...",
+        "prompt_placeholder": "e.g., \"mystery\", \"logic\", \"wordplay\", \"nature\"...",
+        "field_label": "Your Riddle",
+        "button_text": "Share Riddle",
+        "points": 40,
+        "icon": "🧩",
+        "stats_field": "total_riddles"
+    },
+    {
+        "type": "article",
+        "emoji": "📰",
+        "label": "Article",
+        "sizes": [
+            {
+                "id": 80,
+                "label": "Short (≈80 words)"
+            },
+            {
+                "id": 150,
+                "label": "Medium (≈150 words)"
+            },
+            {
+                "id": 250,
+                "label": "Long (≈250 words)"
+            }
+        ],
+        "themes": [
+            {
+                "id": "technology",
+                "label": "💻 Technology"
+            },
+            {
+                "id": "health",
+                "label": "🏥 Health"
+            },
+            {
+                "id": "lifestyle",
+                "label": "🌟 Lifestyle"
+            },
+            {
+                "id": "education",
+                "label": "📚 Education"
+            },
+            {
+                "id": "business",
+                "label": "💼 Business"
+            },
+            {
+                "id": "opinion",
+                "label": "💭 Opinion"
+            }
+        ],
+        "placeholder": "Write your informative article...",
+        "prompt_placeholder": "e.g., \"technology\", \"health\", \"education\", \"lifestyle\"...",
+        "field_label": "Your Article",
+        "button_text": "Publish Article",
+        "points": 40,
+        "icon": "📰",
+        "stats_field": "total_articles"
+    }
+]
 MAIL_SUBJECT = "Here is your Login OTP from Inkly."
 MAIL_SMTP_HOST = "smtp.gmail.com"
 MAIL_SMTP_PORT = 587

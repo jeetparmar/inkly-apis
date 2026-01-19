@@ -17,6 +17,7 @@ from app.services.content_service import (
     fetch_bookmarks_service,
     fetch_user_notifications_service,
     mark_notification_as_read_service,
+    fetch_content_config_service,
 )
 from app.utils.enums.PostFilters import PostDuration, PostSortBy, PostFilter
 from app.models.schema import CommentText, MyResponse, PostRequest
@@ -222,6 +223,14 @@ async def mark_notification_as_read(
 ):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
+    return await mark_notification_as_read_service(auth_response.result["user_id"], notification_id)
+
+
+@content_router.get("/v1/content/config", response_model=MyResponse)
+async def fetch_content_config(auth_response: current_user_dependency):
+    if auth_response.status == ResponseStatus.FAILURE:
+        return auth_response
+    return await fetch_content_config_service(auth_response.result["user_id"])
 
 @content_router.websocket("/v1/ws/notifications/{token}")
 async def websocket_notifications(websocket: WebSocket, token: str):

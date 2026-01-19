@@ -12,7 +12,7 @@ from app.routes.content_routes import content_router
 from app.routes.social_routes import social_router
 
 from app.workers.otp_worker import otp_worker
-from app.utils.constants import INTERESTS_DATA
+from app.utils.constants import INTERESTS_DATA, CONTENT_CONFIGS_DATA
 from app.config.database.mongo import (
     create_device_id_index,
     create_post_bookmark_index,
@@ -20,6 +20,7 @@ from app.config.database.mongo import (
     create_post_view_index,
     create_user_id_index,
     interests_collection,
+    content_configs_collection, 
 )
 
 # ---------------- FastAPI App ---------------- #
@@ -60,12 +61,12 @@ async def startup_event():
     # Sync interests from constants
     try:
         await interests_collection.delete_many({})
-        interests_docs = [
-            {"title": interest.get("title"), "icon": interest.get("icon")}
-            for interest in INTERESTS_DATA
-        ]
-        await interests_collection.insert_many(interests_docs)
+        await interests_collection.insert_many(INTERESTS_DATA)
         print("✅ Interests synchronized")
+
+        await content_configs_collection.delete_many({})
+        await content_configs_collection.insert_many(CONTENT_CONFIGS_DATA)
+        print("✅ Content configs synchronized")    
     except Exception as e:
         print(f"❌ Failed to sync interests: {e}")
 

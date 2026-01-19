@@ -45,6 +45,7 @@ async def create_post_bookmark_index():
 
 
 user_notifications_collection = database.get_collection("user_notifications")
+content_configs_collection = database.get_collection("content_configs")
 
 
 async def create_user_notifications_index():
