@@ -103,22 +103,29 @@ async def generate_content_from_llm_service(
     if error:
         return error
     
-    # Route to appropriate AI model
-    if model.lower() == "openai":
-        output = ask_from_openai(ai_key, type, prompt, size, language, theme)
-    else:  # Default to Gemini
-        output = ask_from_gemini(ai_key, type, prompt, size, language, theme)
-    
-    if not output:
-        return create_exception_response(500, "LLM returned empty output")
-
     try:
+        # Route to appropriate AI model
+        if model.lower() == "openai":
+            output = ask_from_openai(ai_key, type, prompt, size, language, theme)
+        else:  # Default to Gemini
+            output = ask_from_gemini(ai_key, type, prompt, size, language, theme)
+        
+        if not output:
+            return create_exception_response(500, "LLM returned empty output")
+
         title = output.get("title", "")
         content = output.get("content", "")
 
+    except ValueError as e:
+        # Handle errors from AI utilities (rate limits, auth errors, etc.)
+        logger.error(f"AI model error: {e}")
+        return create_exception_response(400, str(e))
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse LLM response: {e}")
         return create_exception_response(500, "Invalid JSON returned from LLM")
+    except Exception as e:
+        logger.error(f"Unexpected error in content generation: {e}")
+        return create_exception_response(500, f"Failed to generate content: {str(e)}")
 
     return create_success_response(
         200,
@@ -126,6 +133,7 @@ async def generate_content_from_llm_service(
         query={"type": type, "prompt": prompt, "theme": theme, "size": size, "model": model},
         result={"title": title, "content": content},
     )
+
 
 
 
