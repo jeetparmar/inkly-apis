@@ -22,6 +22,7 @@ from app.utils.messages import (
     INVALID_DATA,
     NOT_FOUND,
 )
+from app.utils.constants import CONTENT_CONFIGS_DATA
 from app.services.user_service import get_verified_user
 from app.config.database.mongo import (
     posts_collection,
@@ -124,7 +125,9 @@ async def generate_content_from_llm_service(
 async def fetch_posts_service(
     login_user_id: str,
     types: list[PostType],
-    search: str,
+    theme: str = None,
+    tags: list[str] = None,
+    search: str = None,
     filter: PostFilter = PostFilter.NONE,
     user_id: str = None,
     duration: PostDuration = PostDuration.ALL_TIME,
@@ -139,12 +142,38 @@ async def fetch_posts_service(
     if error:
         return error
 
+    # ---------------- Validation ----------------
+    if theme:
+        # If types are provided, only check themes for those types
+        applicable_configs = [
+            conf for conf in CONTENT_CONFIGS_DATA 
+            if not types or conf["type"] in [t.value for t in types]
+        ]
+        
+        valid_themes = set()
+        for conf in applicable_configs:
+            for t in conf.get("themes", []):
+                valid_themes.add(t["id"])
+        
+        if theme not in valid_themes:
+            # Check if it exists in ANY config to give better error message
+            all_themes = {t["id"] for conf in CONTENT_CONFIGS_DATA for t in conf.get("themes", [])}
+            if theme in all_themes:
+                return create_exception_response(400, f"Theme '{theme}' is not applicable for the selected post types.")
+            return create_exception_response(400, f"Invalid theme: '{theme}'.")
+
     page = max(page, 1)
     limit = max(limit, 1)
     # ---------------- Query Stories ----------------
     query = {"is_draft": False}
     if types:
         query["type"] = {"$in": types}
+    
+    if theme:
+        query["theme"] = theme
+        
+    if tags:
+        query["tags"] = {"$all": tags}
     
     if search:
         query["$or"] = [

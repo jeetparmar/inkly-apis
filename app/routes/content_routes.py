@@ -67,6 +67,8 @@ async def generate_content_from_llm(
 async def fetch_posts(
     auth_response: current_user_dependency,
     types: Optional[list[PostType]] = Query(None),
+    theme: Optional[str] = None,
+    tags: Optional[list[str]] = Query(None),
     search: Optional[str] = None,
     filter: Optional[PostFilter] = PostFilter.NONE,
     user_id: Optional[str] = None,
@@ -80,6 +82,8 @@ async def fetch_posts(
     return await fetch_posts_service(
         auth_response.result["user_id"],
         types,
+        theme,
+        tags,
         search,
         filter,
         user_id,
@@ -226,7 +230,7 @@ async def mark_notification_as_read(
     return await mark_notification_as_read_service(auth_response.result["user_id"], notification_id)
 
 
-@content_router.get("/v1/content/config", response_model=MyResponse)
+@content_router.get("/v1/config", response_model=MyResponse)
 async def fetch_content_config(auth_response: current_user_dependency):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
