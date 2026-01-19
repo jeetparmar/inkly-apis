@@ -48,6 +48,7 @@ async def generate_content_from_llm(
     size: int,
     theme: Optional[str] = "inspiring",
     language: Optional[str] = "English",
+    model: Optional[str] = "gemini",
 ):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
@@ -60,7 +61,9 @@ async def generate_content_from_llm(
         theme,
         size,
         language,
+        model,
     )
+
 
 
 @content_router.get("/v1/posts", response_model=MyResponse)

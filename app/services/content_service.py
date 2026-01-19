@@ -11,6 +11,7 @@ from app.models.schema import PostRequest, PostFilterParams
 from app.utils.enums.PostType import PostType
 from app.utils.enums.PostFilters import PostDuration, PostSortBy, PostFilter
 from app.utils.gemini import ask_from_gemini
+from app.utils.chatgpt import ask_from_chatgpt
 from app.utils.methods import (
     convert_iso_date_to_humanize,
     create_success_response,
@@ -93,6 +94,7 @@ async def generate_content_from_llm_service(
     theme: str = None,
     size: int = 50,
     language: str = "English",
+    model: str = "gemini",
 ):
     logger.info("content_service.generate_content_from_llm_service")
 
@@ -100,8 +102,13 @@ async def generate_content_from_llm_service(
     saved_user, error = await get_verified_user(login_user_id)
     if error:
         return error
-    # Call LLM
-    output = ask_from_gemini(ai_key, type, prompt, size, language, theme)
+    
+    # Route to appropriate AI model
+    if model.lower() == "chatgpt":
+        output = ask_from_chatgpt(ai_key, type, prompt, size, language, theme)
+    else:  # Default to Gemini
+        output = ask_from_gemini(ai_key, type, prompt, size, language, theme)
+    
     if not output:
         return create_exception_response(500, "LLM returned empty output")
 
@@ -116,9 +123,10 @@ async def generate_content_from_llm_service(
     return create_success_response(
         200,
         FETCHED_SUCCESS.format(data="generated content"),
-        query={"type": type, "prompt": prompt, "theme": theme, "size": size},
+        query={"type": type, "prompt": prompt, "theme": theme, "size": size, "model": model},
         result={"title": title, "content": content},
     )
+
 
 
 # ---------------- Posts Service ----------------
