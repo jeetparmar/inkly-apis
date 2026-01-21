@@ -134,8 +134,70 @@ async def generate_content_from_llm_service(
         result={"title": title, "content": content},
     )
 
+async def fetch_post_service(login_user_id: str, post_id: str):
+    logger.info("content_service.fetch_post_service")
 
+    # Verify user
+    saved_user, error = await get_verified_user(login_user_id)
+    if error:
+        return error
 
+    try:
+        post_oid = ObjectId(post_id)
+    except Exception:
+        return create_exception_response(400, "Invalid post_id")
+    # Fetch post
+    post = await posts_collection.find_one({"_id": post_oid})
+    if not post:
+        return create_exception_response(404, NOT_FOUND.format(data="post"))
+
+    return create_success_response(
+        200,
+        FETCHED_SUCCESS.format(data="post"),
+        result=await _format_post_data(post, saved_user),
+    )
+
+async def _format_post_data(post: dict, user: dict):
+    is_following = await users_connections_collection.find_one({"following_id": user.get("user_id"), 
+        "follower_id": post.get("author").get("user_id")})
+    is_following = True if is_following else False
+
+    query = {"user_id": user.get("user_id"), "post_id": post.get("_id")}
+
+    is_hearted = await posts_hearts_collection.find_one(query)
+    is_hearted = True if is_hearted else False
+
+    is_commented = await posts_comments_collection.find_one(query) 
+    is_commented = True if is_commented else False
+
+    is_bookmarked = await posts_bookmarks_collection.find_one(query)
+    is_bookmarked = True if is_bookmarked else False
+    
+    return {
+        "id": str(post.get("_id")),
+        "type": post.get("type", ""),
+        "title": post.get("title", ""),
+        "image": post.get("image", ""),
+        "content": post.get("content", ""),
+        "author": {
+            "user_id": user.get("user_id", ""),
+            "name": user.get("name", ""),
+            "username": user.get("username", ""),
+            "avatar": user.get("avatar", ""),
+            "is_following": is_following,
+            "is_verified": False,
+        },
+        "is_hearted": is_hearted,
+        "is_commented": is_commented,
+        "is_bookmarked": is_bookmarked,
+        "is_18_plus": post.get("is_18_plus", False),
+        "is_anonymous": post.get("is_anonymous", False),
+        "is_for_kids": post.get("is_for_kids", False),
+        "stats": post.get("stats", {}),
+        "created_at_readable": convert_iso_date_to_humanize(
+            post.get("created_at")
+        ),
+    }
 
 # ---------------- Posts Service ----------------
 async def fetch_posts_service(
@@ -253,7 +315,6 @@ async def fetch_posts_service(
     )
     return response
 
-
 async def _format_posts_data(login_user_id: str, saved_user: dict, raw_posts: list):
     # ---------------- Fetch Related Data ----------------
     post_ids = [s["_id"] for s in raw_posts]
@@ -341,7 +402,6 @@ async def _format_posts_data(login_user_id: str, saved_user: dict, raw_posts: li
             }
         )
     return posts
-
 
 async def fetch_bookmarks_service(
     login_user_id: str,

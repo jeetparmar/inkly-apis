@@ -5,6 +5,7 @@ from app.services.content_service import (
     generate_content_from_llm_service,
     fetch_related_images_service,
     fetch_posts_service,
+    fetch_post_service,
     fetch_user_posts_service,
     save_post_service,
     save_view_count_service,
@@ -64,8 +65,6 @@ async def generate_content_from_llm(
         model,
     )
 
-
-
 @content_router.get("/v1/posts", response_model=MyResponse)
 async def fetch_posts(
     auth_response: current_user_dependency,
@@ -78,6 +77,11 @@ async def fetch_posts(
         params,
     )
 
+@content_router.get("/v1/posts/{post_id}", response_model=MyResponse)
+async def fetch_post(auth_response: current_user_dependency, post_id: str):
+    if auth_response.status == ResponseStatus.FAILURE:
+        return auth_response
+    return await fetch_post_service(auth_response.result["user_id"], post_id)
 
 @content_router.get("/v1/user_posts", response_model=MyResponse)
 async def fetch_user_posts(
