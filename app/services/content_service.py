@@ -179,6 +179,7 @@ async def _format_post_data(post: dict, user: dict):
         "title": post.get("title", ""),
         "image": post.get("image", ""),
         "content": post.get("content", ""),
+        "theme": post.get("theme", ""),
         "author": {
             "user_id": user.get("user_id", ""),
             "name": user.get("name", ""),
