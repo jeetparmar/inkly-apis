@@ -16,6 +16,8 @@ from app.services.user_service import (
     generate_referral_codes_service,
     redeem_referral_code_service,
 )
+from app.utils.cache_manager import cache_manager
+
 from app.utils.enums.ResponseStatus import ResponseStatus
 from app.config.auth.dependencies import get_current_user
 from app.models.schema import (
@@ -38,18 +40,26 @@ current_user_dependency = Annotated[MyResponse, Depends(get_current_user)]
 
 
 @user_router.get("/v1/interests")
+@cache_manager.cached(tags=["interests"])
 async def fetch_interests():
+
     return await fetch_interests_service()
 
 
 @user_router.get("/v1/prefrence", response_model=MyResponse)
+@cache_manager.cached(tags=["user_pref"])
 async def fetch_prefrences(device_id: str, user_id: Optional[str] = None):
+
     return await fetch_prefrences_service(device_id, user_id)
 
 
 @user_router.post("/v1/prefrence", response_model=MyResponse)
 async def save_prefrence(request: PrefrenceRequest):
-    return await save_prefrence_service(request)
+    result = await save_prefrence_service(request)
+    if result.status == ResponseStatus.SUCCESS:
+        cache_manager.invalidate("user_pref")
+    return result
+
 
 
 @user_router.post("/v1/register_device", response_model=MyResponse)
@@ -66,6 +76,7 @@ async def fetch_points(auth_response: current_user_dependency, page: int = Query
 
 
 @user_router.get("/v1/profile")
+@cache_manager.cached(tags=["user_profile"])
 async def fetch_profile(
     auth_response: current_user_dependency, user_id: Optional[str] = None
 ):
@@ -74,13 +85,18 @@ async def fetch_profile(
     return await fetch_user_profile_service(auth_response.result["user_id"], user_id)
 
 
+
 @user_router.put("/v1/profile")
 async def fetch_profile(
     auth_response: current_user_dependency, request: UserProfileUpdateRequest
 ):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
-    return await update_user_profile_service(auth_response.result["user_id"], request)
+    result = await update_user_profile_service(auth_response.result["user_id"], request)
+    if result.status == ResponseStatus.SUCCESS:
+        cache_manager.invalidate("user_profile")
+    return result
+
 
 
 @user_router.post("/v1/send_otp", response_model=MyResponse)

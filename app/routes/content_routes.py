@@ -26,6 +26,8 @@ from app.utils.enums.PostType import PostType
 from app.utils.enums.ResponseStatus import ResponseStatus
 from app.config.auth.dependencies import get_current_user, get_current_user_ws
 from app.utils.notification_manager import notification_manager
+from app.utils.cache_manager import cache_manager
+
 
 content_router = APIRouter()
 
@@ -66,7 +68,9 @@ async def generate_content_from_llm(
     )
 
 @content_router.get("/v1/posts", response_model=MyResponse)
+@cache_manager.cached(tags=["posts"])
 async def fetch_posts(
+
     auth_response: current_user_dependency,
     params: PostFilterParams = Depends(),
 ):
@@ -78,13 +82,17 @@ async def fetch_posts(
     )
 
 @content_router.get("/v1/posts/{post_id}", response_model=MyResponse)
+@cache_manager.cached(tags=["posts"])
 async def fetch_post(auth_response: current_user_dependency, post_id: str):
+
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
     return await fetch_post_service(auth_response.result["user_id"], post_id)
 
 @content_router.get("/v1/user_posts", response_model=MyResponse)
+@cache_manager.cached(tags=["posts"])
 async def fetch_user_posts(
+
     auth_response: current_user_dependency,
     types: Optional[PostType] = Query(None),
     search: Optional[str] = None,
@@ -109,9 +117,13 @@ async def save_post(
 ):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
-    return await save_post_service(
+    result = await save_post_service(
         auth_response.result["user_id"], request, type, post_id
     )
+    if result.status == ResponseStatus.SUCCESS:
+        cache_manager.invalidate("posts")
+    return result
+
 
 
 @content_router.delete("/v1/post/{post_id}", response_model=MyResponse)
@@ -121,7 +133,11 @@ async def delete_post(
 ):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
-    return await delete_post_service(auth_response.result["user_id"], post_id)
+    result = await delete_post_service(auth_response.result["user_id"], post_id)
+    if result.status == ResponseStatus.SUCCESS:
+        cache_manager.invalidate("posts")
+    return result
+
 
 
 @content_router.post("/v1/view/{post_id}", response_model=MyResponse)
@@ -135,18 +151,28 @@ async def save_post_view_count(auth_response: current_user_dependency, post_id: 
 async def save_bookmark(auth_response: current_user_dependency, post_id: str):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
-    return await toggle_bookmark_service(auth_response.result["user_id"], post_id)
+    result = await toggle_bookmark_service(auth_response.result["user_id"], post_id)
+    if result.status == ResponseStatus.SUCCESS:
+        cache_manager.invalidate("bookmarks")
+    return result
+
 
 
 @content_router.post("/v1/heart/{post_id}")
 async def save_heart(auth_response: current_user_dependency, post_id: str):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
-    return await toggle_heart_service(auth_response.result["user_id"], post_id)
+    result = await toggle_heart_service(auth_response.result["user_id"], post_id)
+    if result.status == ResponseStatus.SUCCESS:
+        cache_manager.invalidate("hearts")
+    return result
+
 
 
 @content_router.get("/v1/hearts/{post_id}", response_model=MyResponse)
+@cache_manager.cached(tags=["hearts"])
 async def fetch_hearts(auth_response: current_user_dependency, post_id: str, page: int = Query(1, gt=0),
+
     limit: int = Query(10, gt=0, le=100)):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
@@ -154,7 +180,9 @@ async def fetch_hearts(auth_response: current_user_dependency, post_id: str, pag
 
 
 @content_router.get("/v1/bookmarks", response_model=MyResponse)
+@cache_manager.cached(tags=["bookmarks"])
 async def fetch_bookmarks(
+
     auth_response: current_user_dependency,
     page: int = Query(1, gt=0),
     limit: int = Query(10, gt=0, le=100),
@@ -165,7 +193,9 @@ async def fetch_bookmarks(
 
 
 @content_router.get("/v1/comments/{post_id}")
+@cache_manager.cached(tags=["comments"])
 async def fetch_comments(
+
     auth_response: current_user_dependency,
     post_id: str,
     page: int = Query(1, gt=0),
@@ -184,16 +214,24 @@ async def save_comment(
 ):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
-    return await save_comment_service(
+    result = await save_comment_service(
         auth_response.result["user_id"], post_id, text.text
     )
+    if result.status == ResponseStatus.SUCCESS:
+        cache_manager.invalidate("comments")
+    return result
+
 
 
 @content_router.delete("/v1/comment/{comment_id}")
 async def delete_comment(auth_response: current_user_dependency, comment_id: str):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
-    return await delete_comment_service(auth_response.result["user_id"], comment_id)
+    result = await delete_comment_service(auth_response.result["user_id"], comment_id)
+    if result.status == ResponseStatus.SUCCESS:
+        cache_manager.invalidate("comments")
+    return result
+
 
 
 @content_router.get("/v1/notifications", response_model=MyResponse)
@@ -220,7 +258,9 @@ async def mark_notification_as_read(
 
 
 @content_router.get("/v1/config", response_model=MyResponse)
+@cache_manager.cached(tags=["config"])
 async def fetch_content_config(auth_response: current_user_dependency):
+
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
     return await fetch_content_config_service(auth_response.result["user_id"])
