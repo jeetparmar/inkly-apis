@@ -294,15 +294,35 @@ async def fetch_posts_service(
     elif params.sort_by == PostSortBy.MOST_COMMENTED:
         sort_field = "stats.comments"
 
-    total = await posts_collection.count_documents(query)
+    # ---------------- Aggregation Pipeline ----------------
+    # 1. Match filters
+    # 2. Sort by created_at DESC (to get latest for each user)
+    # 3. Group by author.user_id, taking the $first (latest)
+    # 4. Replace root to the latest post
+    # 5. Sort by requested sort_field
+    # 6. Pagination (skip/limit)
 
-    cursor = (
-        posts_collection.find(query)
-        .sort(sort_field, -1)
-        .skip((page - 1) * limit)
-        .limit(limit)
-    )
+    pipeline = [
+        {"$match": query},
+        {"$sort": {"created_at": -1}},
+        {"$group": {"_id": "$author.user_id", "latest_post": {"$first": "$$ROOT"}}},
+        {"$replaceRoot": {"newRoot": "$latest_post"}},
+        {"$sort": {sort_field: -1}},
+        {"$skip": (page - 1) * limit},
+        {"$limit": limit}
+    ]
 
+    # Calculate total unique authors matching query
+    total_pipeline = [
+        {"$match": query},
+        {"$group": {"_id": "$author.user_id"}},
+        {"$count": "total"}
+    ]
+    
+    total_result = await posts_collection.aggregate(total_pipeline).to_list(None)
+    total = total_result[0]["total"] if total_result else 0
+
+    cursor = posts_collection.aggregate(pipeline)
     raw_posts = await cursor.to_list(length=limit)
 
     # ---------------- Fetch Related Data ----------------
