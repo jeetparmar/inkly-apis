@@ -511,7 +511,7 @@ async def fetch_user_posts_service(
 
     # ---------------- Query Stories ----------------
     query = {"author.user_id": user_id, "is_draft": is_draft}
-    if type and is_draft == False:
+    if types and is_draft == False:
         query["type"] = types
 
     if search:
