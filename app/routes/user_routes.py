@@ -94,7 +94,7 @@ async def fetch_profile(
         return auth_response
     result = await update_user_profile_service(auth_response.result["user_id"], request)
     if result.status == ResponseStatus.SUCCESS:
-        cache_manager.invalidate("user_profile")
+        cache_manager.invalidate(["user_profile", "posts"])
     return result
 
 

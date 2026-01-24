@@ -121,7 +121,7 @@ async def save_post(
         auth_response.result["user_id"], request, type, post_id
     )
     if result.status == ResponseStatus.SUCCESS:
-        cache_manager.invalidate("posts")
+        cache_manager.invalidate(["posts", "user_profile"])
     return result
 
 
@@ -135,7 +135,7 @@ async def delete_post(
         return auth_response
     result = await delete_post_service(auth_response.result["user_id"], post_id)
     if result.status == ResponseStatus.SUCCESS:
-        cache_manager.invalidate("posts")
+        cache_manager.invalidate(["posts", "hearts", "comments", "bookmarks", "user_profile"])
     return result
 
 
@@ -144,7 +144,10 @@ async def delete_post(
 async def save_post_view_count(auth_response: current_user_dependency, post_id: str):
     if auth_response.status == ResponseStatus.FAILURE:
         return auth_response
-    return await save_view_count_service(auth_response.result["user_id"], post_id)
+    result = await save_view_count_service(auth_response.result["user_id"], post_id)
+    if result.status == ResponseStatus.SUCCESS:
+        cache_manager.invalidate("posts")
+    return result
 
 
 @content_router.post("/v1/bookmark/{post_id}")
@@ -153,7 +156,7 @@ async def save_bookmark(auth_response: current_user_dependency, post_id: str):
         return auth_response
     result = await toggle_bookmark_service(auth_response.result["user_id"], post_id)
     if result.status == ResponseStatus.SUCCESS:
-        cache_manager.invalidate("bookmarks")
+        cache_manager.invalidate(["bookmarks", "posts", "user_profile"])
     return result
 
 
@@ -164,7 +167,7 @@ async def save_heart(auth_response: current_user_dependency, post_id: str):
         return auth_response
     result = await toggle_heart_service(auth_response.result["user_id"], post_id)
     if result.status == ResponseStatus.SUCCESS:
-        cache_manager.invalidate("hearts")
+        cache_manager.invalidate(["hearts", "posts", "user_profile"])
     return result
 
 
@@ -218,7 +221,7 @@ async def save_comment(
         auth_response.result["user_id"], post_id, text.text
     )
     if result.status == ResponseStatus.SUCCESS:
-        cache_manager.invalidate("comments")
+        cache_manager.invalidate(["comments", "posts"])
     return result
 
 
@@ -229,7 +232,7 @@ async def delete_comment(auth_response: current_user_dependency, comment_id: str
         return auth_response
     result = await delete_comment_service(auth_response.result["user_id"], comment_id)
     if result.status == ResponseStatus.SUCCESS:
-        cache_manager.invalidate("comments")
+        cache_manager.invalidate(["comments", "posts"])
     return result
 
 
