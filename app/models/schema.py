@@ -46,9 +46,9 @@ class PostRequest(BaseModel):
 
 
 class PostFilterParams(BaseModel):
-    types: Optional[list[PostType]] = Query(None)
+    type: Optional[PostType] = Query(None)
     theme: Optional[str] = None
-    tags: Optional[list[str]] = Query(None)
+    tag: Optional[str] = Query(None)
     search: Optional[str] = None
     is_18_plus: Optional[bool] = Query(False)
     is_anonymous: Optional[bool] = Query(None)

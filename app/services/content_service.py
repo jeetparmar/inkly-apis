@@ -218,7 +218,7 @@ async def fetch_posts_service(
         # If types are provided, only check themes for those types
         applicable_configs = [
             conf for conf in CONTENT_CONFIGS_DATA 
-            if not params.types or conf["type"] in [t.value for t in params.types]
+            if not params.type or conf["type"] == params.type.value
         ]
         
         valid_themes = set()
@@ -245,14 +245,14 @@ async def fetch_posts_service(
         
     if params.is_for_kids is not None:
         query["is_for_kids"] = params.is_for_kids
-    if params.types:
-        query["type"] = {"$in": params.types}
+    if params.type:
+        query["type"] = params.type
     
     if params.theme:
         query["theme"] = params.theme
         
-    if params.tags:
-        query["tags"] = {"$all": params.tags}
+    if params.tag:
+        query["tags"] = params.tag
     
     if params.search:
         query["$or"] = [
