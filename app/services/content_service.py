@@ -115,6 +115,7 @@ async def generate_content_from_llm_service(
 
         title = output.get("title", "")
         content = output.get("content", "")
+        tags = output.get("tags", [])
 
     except ValueError as e:
         # Handle errors from AI utilities (rate limits, auth errors, etc.)
@@ -131,7 +132,7 @@ async def generate_content_from_llm_service(
         200,
         FETCHED_SUCCESS.format(data="generated content"),
         query={"type": type, "prompt": prompt, "theme": theme, "size": size, "model": model},
-        result={"title": title, "content": content},
+        result={"title": title, "content": content, "tags": tags},
     )
 
 async def fetch_post_service(login_user_id: str, post_id: str):
@@ -401,6 +402,7 @@ async def _format_posts_data(login_user_id: str, saved_user: dict, raw_posts: li
                 "type": post.get("type", ""),
                 "title": post.get("title", ""),
                 "image": post.get("image", ""),
+                "theme": post.get("theme", ""),
                 "content": post.get("content", ""),
                 "author": {
                     "user_id": user_id,

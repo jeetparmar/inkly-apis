@@ -19,11 +19,12 @@ def ask_from_gemini(
     Language: {content_language}.
 
     Requirements:
-    1. The content MUST be valid JSON with exactly two keys: "title" and "content".
+    1. The content MUST be valid JSON with exactly three keys: "title", "content", and "tags".
     2. "title": A creative title.
     3. "content": The story text.
-    4. Theme: {content_theme}.
-    5. STYLE: Use simple, easy-to-understand language suitable for a general audience. Avoid complex vocabulary.
+    4. "tags": A list of tags related to the story.
+    5. Theme: {content_theme}.
+    6. STYLE: Use simple, easy-to-understand language suitable for a general audience. Avoid complex vocabulary.
     
     LENGTH CONSTRAINT:
     - Target word count: {content_size} words.
